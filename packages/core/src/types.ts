@@ -24,6 +24,7 @@ export type WorkflowStep = {
   readonly input: WorkflowInputValue;
   readonly allowedModes?: readonly ActionMode[];
   readonly approvalToken?: string;
+  readonly approvalContext?: ApprovalContextOverrides;
 };
 
 export type WorkflowDefinition = {
@@ -43,6 +44,7 @@ export type AgentExecutionContext = {
   readonly actionName: string;
   readonly mode: ActionMode;
   readonly approvalToken?: string;
+  readonly approvalContext: ApprovalContext;
   readonly metadata: Readonly<Record<string, unknown>>;
   requireApproval(): void;
 };
@@ -80,6 +82,26 @@ export type ApprovalCheckInput = {
   readonly action: ExecutableActionDefinition;
   readonly input: unknown;
   readonly context: AgentExecutionContext;
+  readonly approvalToken?: string;
+  readonly approvalContext: ApprovalContext;
+};
+
+export type ApprovalContext = {
+  readonly userId: string;
+  readonly actionName: string;
+  readonly mode: ActionMode;
+  readonly inputHash: string;
+  readonly resourceIds?: readonly string[];
+  readonly dryRunHash?: string;
+  readonly expiresAt?: string;
+  readonly workflowId?: string;
+  readonly stepId?: string;
+};
+
+export type ApprovalContextOverrides = {
+  readonly resourceIds?: readonly string[];
+  readonly dryRunHash?: string;
+  readonly expiresAt?: string;
 };
 
 export type ApprovalCheckResult =
@@ -122,6 +144,7 @@ export type ActionExecutionInput = {
   readonly input: unknown;
   readonly allowedModes?: readonly ActionMode[];
   readonly approvalToken?: string;
+  readonly approvalContext?: ApprovalContextOverrides;
   readonly workflowId?: string;
   readonly stepId?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;

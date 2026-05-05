@@ -132,8 +132,10 @@ describe('AgentRunnerModule', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
         AgentRunnerModule.forRoot({
-          approval: ({ context }) => (
-            context.approvalToken === 'token_1'
+          approval: ({ approvalToken, approvalContext }) => (
+            approvalToken === 'token_1'
+            && approvalContext.actionName === 'delivery.executeRetry'
+            && approvalContext.resourceIds?.[0] === 'job_1'
               ? { approved: true, approvalId: 'approval_1' }
               : { approved: false }
           ),
@@ -151,6 +153,9 @@ describe('AgentRunnerModule', () => {
       input: { jobIds: ['job_1'] },
       allowedModes: ['mutate'],
       approvalToken: 'token_1',
+      approvalContext: {
+        resourceIds: ['job_1'],
+      },
     });
 
     expect(result).toMatchObject({

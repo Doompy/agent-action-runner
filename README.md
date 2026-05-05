@@ -6,6 +6,10 @@ Expose existing service logic as agent-callable actions with schema validation, 
 
 ## Status
 
+Experimental / pre-1.0. Public APIs may change while the action, workflow, and approval contracts settle.
+
+See [CHANGELOG.md](./CHANGELOG.md) for release notes.
+
 This repository starts with a framework-agnostic core package and a NestJS adapter:
 
 - Action registry
@@ -23,7 +27,9 @@ This repository starts with a framework-agnostic core package and a NestJS adapt
 @agent-action-runner/nestjs
 ```
 
-## Install
+Before publishing these packages, the `@agent-action-runner` npm organization/scope must exist and the publisher must have access to it.
+
+## Core Quickstart
 
 ```bash
 npm install @agent-action-runner/core zod
@@ -96,7 +102,7 @@ const result = await runner.executeWorkflow({
 });
 ```
 
-## NestJS Adapter
+## NestJS Quickstart
 
 ```bash
 npm install @agent-action-runner/core @agent-action-runner/nestjs zod
@@ -135,6 +141,49 @@ export class AppModule {}
 ```
 
 Decorated provider methods are registered into the shared core runner during NestJS module initialization. Use `InjectAgentRunner()` or the `AGENT_RUNNER` token when you need to execute actions or workflows from another NestJS provider.
+
+## Mutate Approval Model
+
+`mutate` actions are blocked by default unless the execution explicitly allows `mutate` mode and the configured approval hook approves the request.
+
+The approval hook receives:
+
+```ts
+{
+  approvalToken?: string;
+  approvalContext: {
+    userId: string;
+    actionName: string;
+    mode: 'read' | 'draft' | 'dryRun' | 'mutate';
+    inputHash: string;
+    resourceIds?: readonly string[];
+    dryRunHash?: string;
+    expiresAt?: string;
+    workflowId?: string;
+    stepId?: string;
+  };
+}
+```
+
+Core does not issue or sign approval tokens. Applications should bind approval tokens to the approval context fields they care about, especially `userId`, `actionName`, `mode`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`.
+
+## Publish Checklist
+
+This repository is configured for public scoped packages:
+
+```bash
+npm run build
+npm run typecheck
+npm test
+npm run pack:check
+```
+
+Actual publishing is intentionally manual:
+
+```bash
+npm publish --workspace @agent-action-runner/core --access public
+npm publish --workspace @agent-action-runner/nestjs --access public
+```
 
 ## License
 

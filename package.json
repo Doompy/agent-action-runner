@@ -4,14 +4,37 @@
   "private": true,
   "description": "A safe, application-native action and workflow runner for TypeScript backends.",
   "license": "Apache-2.0",
+  "author": "Doompy",
   "type": "module",
   "packageManager": "npm@11.9.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Doompy/agent-action-runner.git"
+  },
+  "homepage": "https://github.com/Doompy/agent-action-runner#readme",
+  "bugs": {
+    "url": "https://github.com/Doompy/agent-action-runner/issues"
+  },
+  "keywords": [
+    "agent",
+    "actions",
+    "workflow",
+    "typescript",
+    "nestjs",
+    "approval",
+    "audit",
+    "llm"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "workspaces": [
     "packages/*",
     "examples/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "pack:check": "npm pack --workspace @agent-action-runner/core --dry-run && npm pack --workspace @agent-action-runner/nestjs --dry-run",
     "pretest": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "pretypecheck": "npm run build --workspace @agent-action-runner/core --if-present",

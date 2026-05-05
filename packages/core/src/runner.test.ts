@@ -121,8 +121,8 @@ describe('AgentActionRunner', () => {
 
   it('passes approval when the approval hook approves', async () => {
     const runner = createRunner({
-      approval: ({ context }) => (
-        context.approvalToken === 'token_1'
+      approval: ({ approvalToken }) => (
+        approvalToken === 'token_1'
           ? { approved: true, approvalId: 'approval_1' }
           : { approved: false }
       ),
@@ -141,6 +141,85 @@ describe('AgentActionRunner', () => {
       input: {},
       allowedModes: ['mutate'],
       approvalToken: 'token_1',
+    });
+
+    expect(result.approvalId).toBe('approval_1');
+  });
+
+  it('passes approval context with a deterministic input hash', async () => {
+    const inputHashes: string[] = [];
+    const runner = createRunner({
+      approval: ({ approvalContext }) => {
+        inputHashes.push(approvalContext.inputHash);
+        return { approved: true };
+      },
+    });
+
+    runner.registerAction({
+      name: 'delivery.executeRetry',
+      mode: 'mutate',
+      inputSchema: z.object({
+        jobIds: z.array(z.string()),
+      }),
+      handler: () => ({ ok: true }),
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'delivery.executeRetry',
+      input: { jobIds: ['job_1', 'job_2'] },
+      allowedModes: ['mutate'],
+      approvalToken: 'token_1',
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'delivery.executeRetry',
+      input: { jobIds: ['job_1', 'job_2'] },
+      allowedModes: ['mutate'],
+      approvalToken: 'token_1',
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'delivery.executeRetry',
+      input: { jobIds: ['job_2'] },
+      allowedModes: ['mutate'],
+      approvalToken: 'token_1',
+    });
+
+    expect(inputHashes[0]).toBe(inputHashes[1]);
+    expect(inputHashes[0]).not.toBe(inputHashes[2]);
+  });
+
+  it('passes approval context overrides to the approval hook', async () => {
+    const runner = createRunner({
+      approval: ({ approvalContext }) => (
+        approvalContext.resourceIds?.[0] === 'job_1'
+        && approvalContext.dryRunHash === 'dry_run_hash'
+        && approvalContext.expiresAt === '2026-05-06T00:00:00.000Z'
+          ? { approved: true, approvalId: 'approval_1' }
+          : { approved: false }
+      ),
+    });
+
+    runner.registerAction({
+      name: 'delivery.executeRetry',
+      mode: 'mutate',
+      handler: () => ({ ok: true }),
+    });
+
+    const result = await runner.executeAction({
+      userId: 'user_1',
+      action: 'delivery.executeRetry',
+      input: { jobIds: ['job_1'] },
+      allowedModes: ['mutate'],
+      approvalToken: 'token_1',
+      approvalContext: {
+        resourceIds: ['job_1'],
+        dryRunHash: 'dry_run_hash',
+        expiresAt: '2026-05-06T00:00:00.000Z',
+      },
     });
 
     expect(result.approvalId).toBe('approval_1');

@@ -8,6 +8,7 @@ import {
   WorkflowExecutionError,
 } from './errors.js';
 import { randomUUID } from 'node:crypto';
+import { createStableHash } from './hash.js';
 import { fromStep, resolveWorkflowInput } from './references.js';
 import type {
   ActionDefinition,
@@ -17,6 +18,7 @@ import type {
   ActionMode,
   AgentExecutionContext,
   AgentRunnerOptions,
+  ApprovalContext,
   ExecutableActionDefinition,
   WorkflowExecutionInput,
   WorkflowExecutionResult,
@@ -66,6 +68,12 @@ export class AgentActionRunner {
     }
 
     const executionId = this.options.createExecutionId?.() ?? randomUUID();
+    const input = parseWithSchema(action, 'input', request.input);
+    const approvalContext = createApprovalContext({
+      action,
+      input,
+      request,
+    });
     let approved = false;
     const context: AgentExecutionContext = {
       executionId,
@@ -75,6 +83,7 @@ export class AgentActionRunner {
       actionName: action.name,
       mode: action.mode,
       approvalToken: request.approvalToken,
+      approvalContext,
       metadata: request.metadata ?? {},
       requireApproval: () => {
         if (!approved) {
@@ -82,8 +91,6 @@ export class AgentActionRunner {
         }
       },
     };
-
-    const input = parseWithSchema(action, 'input', request.input);
 
     const startedEvent = createAuditEvent({
       action,
@@ -102,7 +109,13 @@ export class AgentActionRunner {
       }
 
       if (action.approvalRequired || action.mode === 'mutate') {
-        const approvalResult = await this.options.approval?.({ action, input, context });
+        const approvalResult = await this.options.approval?.({
+          action,
+          input,
+          context,
+          approvalToken: request.approvalToken,
+          approvalContext,
+        });
         if (!approvalResult?.approved) {
           throw new ApprovalRequiredError(action.name);
         }
@@ -162,6 +175,7 @@ export class AgentActionRunner {
           input,
           allowedModes,
           approvalToken: step.approvalToken,
+          approvalContext: step.approvalContext,
           metadata: request.metadata,
         });
 
@@ -203,6 +217,24 @@ function parseWithSchema(
   }
 
   return result.data;
+}
+
+function createApprovalContext(input: {
+  action: ExecutableActionDefinition;
+  input: unknown;
+  request: ActionExecutionInput;
+}): ApprovalContext {
+  return {
+    userId: input.request.userId,
+    actionName: input.action.name,
+    mode: input.action.mode,
+    inputHash: createStableHash(input.input),
+    resourceIds: input.request.approvalContext?.resourceIds,
+    dryRunHash: input.request.approvalContext?.dryRunHash,
+    expiresAt: input.request.approvalContext?.expiresAt,
+    workflowId: input.request.workflowId,
+    stepId: input.request.stepId,
+  };
 }
 
 function createAuditEvent(input: {

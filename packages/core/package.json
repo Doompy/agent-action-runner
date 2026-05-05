@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Framework-agnostic core for Agent Action Runner.",
   "license": "Apache-2.0",
+  "author": "Doompy",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -14,15 +17,42 @@
     "dist",
     "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Doompy/agent-action-runner.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/Doompy/agent-action-runner#readme",
+  "bugs": {
+    "url": "https://github.com/Doompy/agent-action-runner/issues"
+  },
+  "keywords": [
+    "agent",
+    "actions",
+    "workflow",
+    "typescript",
+    "approval",
+    "audit",
+    "llm"
+  ],
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
   "scripts": {
+    "prepack": "npm run build",
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-  "dependencies": {
-    "zod": "^4.1.13"
+  "peerDependencies": {
+    "zod": "^3.25.0 || ^4.0.0"
   },
   "devDependencies": {
+    "zod": "^4.1.13",
     "vitest": "^4.0.14"
   }
 }

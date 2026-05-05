@@ -14,6 +14,8 @@ export type {
   AgentExecutionContext,
   AgentRunnerOptions,
   ApprovalCheck,
+  ApprovalContext,
+  ApprovalContextOverrides,
   AuditHook,
   ExecutableActionDefinition,
   JsonPointer,

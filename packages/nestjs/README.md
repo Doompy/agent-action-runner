@@ -2,6 +2,16 @@
 
 NestJS adapter for Agent Action Runner.
 
+Experimental / pre-1.0. Public APIs may change while the action, workflow, and approval contracts settle.
+
+## Install
+
+```bash
+npm install @agent-action-runner/core @agent-action-runner/nestjs zod
+```
+
+## Quickstart
+
 ```ts
 import { Injectable, Module } from '@nestjs/common';
 import { AgentAction, AgentRunnerModule } from '@agent-action-runner/nestjs';
@@ -22,7 +32,16 @@ class DeliveryAgentActions {
 }
 
 @Module({
-  imports: [AgentRunnerModule.forRoot()],
+  imports: [
+    AgentRunnerModule.forRoot({
+      approval: ({ approvalToken, approvalContext }) => (
+        approvalToken === 'approved'
+        && approvalContext.mode === 'mutate'
+          ? { approved: true }
+          : { approved: false }
+      ),
+    }),
+  ],
   providers: [DeliveryAgentActions],
 })
 export class AppModule {}
@@ -43,3 +62,5 @@ class AgentWorkflowService {
   ) {}
 }
 ```
+
+Decorated provider methods are registered into the shared core runner during NestJS module initialization. `mutate` actions follow the same approval model as `@agent-action-runner/core`.
