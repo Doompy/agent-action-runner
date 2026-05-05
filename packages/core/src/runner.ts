@@ -1,0 +1,234 @@
+import {
+  ActionAlreadyRegisteredError,
+  ActionNotFoundError,
+  ApprovalRequiredError,
+  ModeNotAllowedError,
+  PolicyRejectedError,
+  SchemaValidationError,
+  WorkflowExecutionError,
+} from './errors.js';
+import { randomUUID } from 'node:crypto';
+import { fromStep, resolveWorkflowInput } from './references.js';
+import type {
+  ActionDefinition,
+  ActionExecutionEvent,
+  ActionExecutionInput,
+  ActionExecutionResult,
+  ActionMode,
+  AgentExecutionContext,
+  AgentRunnerOptions,
+  ExecutableActionDefinition,
+  WorkflowExecutionInput,
+  WorkflowExecutionResult,
+  WorkflowStepResult,
+} from './types.js';
+
+const DEFAULT_ALLOWED_MODES: readonly ActionMode[] = ['read', 'draft', 'dryRun'];
+
+export { fromStep };
+
+export function createRunner(options: AgentRunnerOptions = {}): AgentActionRunner {
+  return new AgentActionRunner(options);
+}
+
+export class AgentActionRunner {
+  private readonly actions = new Map<string, ExecutableActionDefinition>();
+
+  constructor(private readonly options: AgentRunnerOptions = {}) {}
+
+  registerAction<Input, Output>(definition: ActionDefinition<Input, Output>): void {
+    if (this.actions.has(definition.name)) {
+      throw new ActionAlreadyRegisteredError(definition.name);
+    }
+
+    this.actions.set(definition.name, definition as ExecutableActionDefinition);
+  }
+
+  getAction(name: string): ExecutableActionDefinition | undefined {
+    return this.actions.get(name);
+  }
+
+  listActions(): readonly ExecutableActionDefinition[] {
+    return [...this.actions.values()];
+  }
+
+  async executeAction<Output = unknown>(
+    request: ActionExecutionInput,
+  ): Promise<ActionExecutionResult<Output>> {
+    const action = this.actions.get(request.action);
+    if (!action) {
+      throw new ActionNotFoundError(request.action);
+    }
+
+    const allowedModes = request.allowedModes ?? this.options.defaultAllowedModes ?? DEFAULT_ALLOWED_MODES;
+    if (!allowedModes.includes(action.mode)) {
+      throw new ModeNotAllowedError(action.name, action.mode);
+    }
+
+    const executionId = this.options.createExecutionId?.() ?? randomUUID();
+    let approved = false;
+    const context: AgentExecutionContext = {
+      executionId,
+      workflowId: request.workflowId,
+      stepId: request.stepId,
+      userId: request.userId,
+      actionName: action.name,
+      mode: action.mode,
+      approvalToken: request.approvalToken,
+      metadata: request.metadata ?? {},
+      requireApproval: () => {
+        if (!approved) {
+          throw new ApprovalRequiredError(action.name);
+        }
+      },
+    };
+
+    const input = parseWithSchema(action, 'input', request.input);
+
+    const startedEvent = createAuditEvent({
+      action,
+      context,
+      input,
+      status: 'started',
+    });
+    await this.options.audit?.(startedEvent);
+
+    let approvalId: string | undefined;
+
+    try {
+      const policyResult = await this.options.policy?.({ action, input, context });
+      if (policyResult && !policyResult.allowed) {
+        throw new PolicyRejectedError(action.name, policyResult.reason);
+      }
+
+      if (action.approvalRequired || action.mode === 'mutate') {
+        const approvalResult = await this.options.approval?.({ action, input, context });
+        if (!approvalResult?.approved) {
+          throw new ApprovalRequiredError(action.name);
+        }
+        approved = true;
+        approvalId = approvalResult.approvalId;
+      }
+
+      const rawOutput = await action.handler(input, context);
+
+      const output = parseWithSchema(action, 'output', rawOutput);
+
+      await this.options.audit?.(createAuditEvent({
+        action,
+        approvalId,
+        context,
+        input,
+        output,
+        outputSummary: this.options.summarizeOutput?.(output),
+        status: 'succeeded',
+      }));
+
+      return {
+        executionId,
+        actionName: action.name,
+        mode: action.mode,
+        output: output as Output,
+        approvalId,
+      };
+    } catch (error) {
+      await this.options.audit?.(createAuditEvent({
+        action,
+        approvalId,
+        context,
+        error,
+        input,
+        status: 'failed',
+      }));
+      throw error;
+    }
+  }
+
+  async executeWorkflow(request: WorkflowExecutionInput): Promise<WorkflowExecutionResult> {
+    const workflowId = request.workflowId ?? this.options.createExecutionId?.() ?? randomUUID();
+    const outputByStep: Record<string, unknown> = {};
+    const stepResults: WorkflowStepResult[] = [];
+
+    for (const step of request.workflow.steps) {
+      const input = resolveWorkflowInput(step.input, outputByStep);
+      const allowedModes = step.allowedModes ?? request.allowedModes;
+
+      try {
+        const result = await this.executeAction({
+          userId: request.userId,
+          workflowId,
+          stepId: step.id,
+          action: step.action,
+          input,
+          allowedModes,
+          approvalToken: step.approvalToken,
+          metadata: request.metadata,
+        });
+
+        outputByStep[step.id] = result.output;
+        stepResults.push({
+          id: step.id,
+          actionName: result.actionName,
+          mode: result.mode,
+          executionId: result.executionId,
+          output: result.output,
+        });
+      } catch (error) {
+        throw new WorkflowExecutionError(step.id, step.action, error);
+      }
+    }
+
+    return {
+      workflowId,
+      workflowName: request.workflow.workflowName,
+      steps: stepResults,
+      outputByStep,
+    };
+  }
+}
+
+function parseWithSchema(
+  action: ExecutableActionDefinition,
+  target: 'input' | 'output',
+  value: unknown,
+): unknown {
+  const schema = target === 'input' ? action.inputSchema : action.outputSchema;
+  if (!schema) {
+    return value;
+  }
+
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw new SchemaValidationError(action.name, target, result.error);
+  }
+
+  return result.data;
+}
+
+function createAuditEvent(input: {
+  action: ExecutableActionDefinition;
+  approvalId?: string;
+  context: AgentExecutionContext;
+  error?: unknown;
+  input: unknown;
+  output?: unknown;
+  outputSummary?: string;
+  status: ActionExecutionEvent['status'];
+}): ActionExecutionEvent {
+  return {
+    executionId: input.context.executionId,
+    workflowId: input.context.workflowId,
+    stepId: input.context.stepId,
+    userId: input.context.userId,
+    actionName: input.action.name,
+    mode: input.action.mode,
+    input: input.input,
+    output: input.output,
+    outputSummary: input.outputSummary,
+    approvalToken: input.context.approvalToken,
+    approvalId: input.approvalId,
+    status: input.status,
+    error: input.error,
+    createdAt: new Date(),
+  };
+}

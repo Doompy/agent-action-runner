@@ -1,0 +1,3 @@
+export const AGENT_RUNNER = Symbol('AGENT_RUNNER');
+export const AGENT_RUNNER_OPTIONS = Symbol('AGENT_RUNNER_OPTIONS');
+export const AGENT_ACTION_METADATA = Symbol('AGENT_ACTION_METADATA');

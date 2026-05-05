@@ -1,0 +1,13 @@
+{
+  "name": "agent-action-runner-basic-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@agent-action-runner/core": "file:../../packages/core",
+    "zod": "^4.1.13"
+  }
+}
