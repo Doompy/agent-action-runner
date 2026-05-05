@@ -21,6 +21,7 @@ This project is focused on a safety boundary between agents and TypeScript backe
 
 - Add persistent audit examples.
 - Add approval token binding examples.
+- The first in-memory approval/audit example was added in v0.2.1; v0.5.0 should focus on persistence and production integration patterns.
 - Start with examples before publishing Redis or Prisma integration packages.
 
 ## v0.6.0

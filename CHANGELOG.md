@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.2.1] - 2026-05-06
+
+### Added
+
+- Added `examples/express-admin-ops`, an operational Express example showing `read -> dryRun -> approve -> mutate -> audit`.
+- Added an HMAC-bound approval token demo that binds approval to `userId`, `actionName`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`.
+- Added an in-memory audit trail example for action execution events.
+
+### Notes
+
+- No public package APIs changed.
+- Public package versions remain `0.2.0`; this is an example and documentation update.
+
 ## [0.2.0] - 2026-05-06
 
 ### Added
