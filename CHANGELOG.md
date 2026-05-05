@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.2.0] - 2026-05-06
+
+### Added
+
+- Added `@agent-action-runner/http` with shared HTTP response shapes, action/workflow execution helpers, server-side request context handling, and error mapping.
+- Added `@agent-action-runner/express` with `createExpressAdapter()`.
+- Added `@agent-action-runner/fastify` with `agentRunnerFastifyPlugin`.
+- Added `ROADMAP.md` with the planned Next.js adapter, workflow builder, audit/approval examples, and MCP exporter direction.
+
+### Changed
+
+- Bumped public package versions to `0.2.0`.
+- Updated package dry-run checks to cover `core`, `nestjs`, `http`, `express`, and `fastify`.
+
+### Notes
+
+- HTTP adapters require server-side `getUserId` resolver configuration.
+- Client-supplied execution options are ignored by default. Enable `allowClientExecutionOptions` only for trusted/internal use cases.
+
 ## [0.1.0] - 2026-05-06
 
 ### Added

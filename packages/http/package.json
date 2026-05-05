@@ -1,7 +1,7 @@
 {
-  "name": "@agent-action-runner/nestjs",
+  "name": "@agent-action-runner/http",
   "version": "0.2.0",
-  "description": "NestJS adapter for Agent Action Runner.",
+  "description": "Shared HTTP adapter utilities for Agent Action Runner.",
   "license": "Apache-2.0",
   "author": "Doompy",
   "type": "module",
@@ -20,7 +20,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Doompy/agent-action-runner.git",
-    "directory": "packages/nestjs"
+    "directory": "packages/http"
   },
   "homepage": "https://github.com/Doompy/agent-action-runner#readme",
   "bugs": {
@@ -31,7 +31,7 @@
     "actions",
     "workflow",
     "typescript",
-    "nestjs",
+    "http",
     "approval",
     "audit",
     "llm"
@@ -53,21 +53,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
-    "@agent-action-runner/core": "^0.2.0",
-    "@nestjs/common": "^10.0.0 || ^11.0.0",
-    "@nestjs/core": "^10.0.0 || ^11.0.0",
-    "reflect-metadata": "^0.1.13 || ^0.2.0",
-    "rxjs": "^7.8.0",
-    "zod": "^3.25.0 || ^4.0.0"
+    "@agent-action-runner/core": "^0.2.0"
   },
   "devDependencies": {
     "@agent-action-runner/core": "file:../core",
-    "@nestjs/common": "^11.0.0",
-    "@nestjs/core": "^11.0.0",
-    "@nestjs/testing": "^11.0.0",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2",
-    "zod": "^4.1.13",
-    "vitest": "^4.0.14"
+    "vitest": "^4.0.14",
+    "zod": "^4.1.13"
   }
 }

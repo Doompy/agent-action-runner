@@ -1,7 +1,7 @@
 {
-  "name": "@agent-action-runner/nestjs",
+  "name": "@agent-action-runner/express",
   "version": "0.2.0",
-  "description": "NestJS adapter for Agent Action Runner.",
+  "description": "Express adapter for Agent Action Runner.",
   "license": "Apache-2.0",
   "author": "Doompy",
   "type": "module",
@@ -20,7 +20,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Doompy/agent-action-runner.git",
-    "directory": "packages/nestjs"
+    "directory": "packages/express"
   },
   "homepage": "https://github.com/Doompy/agent-action-runner#readme",
   "bugs": {
@@ -31,7 +31,7 @@
     "actions",
     "workflow",
     "typescript",
-    "nestjs",
+    "express",
     "approval",
     "audit",
     "llm"
@@ -45,29 +45,31 @@
   "sideEffects": false,
   "scripts": {
     "prepack": "npm run build",
-    "prebuild": "npm run build --workspace @agent-action-runner/core --if-present",
+    "prebuild": "npm run build --workspace @agent-action-runner/http --if-present",
     "build": "tsc -p tsconfig.build.json",
-    "pretest": "npm run build --workspace @agent-action-runner/core --if-present",
+    "pretest": "npm run build --workspace @agent-action-runner/http --if-present",
     "test": "vitest run",
-    "pretypecheck": "npm run build --workspace @agent-action-runner/core --if-present",
+    "pretypecheck": "npm run build --workspace @agent-action-runner/http --if-present",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
     "@agent-action-runner/core": "^0.2.0",
-    "@nestjs/common": "^10.0.0 || ^11.0.0",
-    "@nestjs/core": "^10.0.0 || ^11.0.0",
-    "reflect-metadata": "^0.1.13 || ^0.2.0",
-    "rxjs": "^7.8.0",
-    "zod": "^3.25.0 || ^4.0.0"
+    "@agent-action-runner/http": "^0.2.0",
+    "express": "^4.18.0 || ^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@types/express": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@agent-action-runner/core": "file:../core",
-    "@nestjs/common": "^11.0.0",
-    "@nestjs/core": "^11.0.0",
-    "@nestjs/testing": "^11.0.0",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2",
-    "zod": "^4.1.13",
-    "vitest": "^4.0.14"
+    "@agent-action-runner/http": "file:../http",
+    "@types/express": "^5.0.6",
+    "@types/supertest": "^6.0.3",
+    "express": "^5.2.1",
+    "supertest": "^7.1.4",
+    "vitest": "^4.0.14",
+    "zod": "^4.1.13"
   }
 }

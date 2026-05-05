@@ -10,7 +10,7 @@ Experimental / pre-1.0. Public APIs may change while the action, workflow, and a
 
 See [CHANGELOG.md](./CHANGELOG.md) for release notes.
 
-This repository starts with a framework-agnostic core package and a NestJS adapter:
+This repository starts with a framework-agnostic core package and first-party framework adapters:
 
 - Action registry
 - Sequential JSON workflow runner
@@ -19,12 +19,16 @@ This repository starts with a framework-agnostic core package and a NestJS adapt
 - Policy, approval, and audit hooks
 - Restricted step output references
 - NestJS `@AgentAction()` provider discovery
+- Express and Fastify HTTP adapters
 
 ## Packages
 
 ```txt
 @agent-action-runner/core
 @agent-action-runner/nestjs
+@agent-action-runner/http
+@agent-action-runner/express
+@agent-action-runner/fastify
 ```
 
 Before publishing these packages, the `@agent-action-runner` npm organization/scope must exist and the publisher must have access to it.
@@ -142,6 +146,48 @@ export class AppModule {}
 
 Decorated provider methods are registered into the shared core runner during NestJS module initialization. Use `InjectAgentRunner()` or the `AGENT_RUNNER` token when you need to execute actions or workflows from another NestJS provider.
 
+## Express Quickstart
+
+```bash
+npm install @agent-action-runner/core @agent-action-runner/http @agent-action-runner/express express zod
+```
+
+```ts
+import express from 'express';
+import { createRunner } from '@agent-action-runner/core';
+import { createExpressAdapter } from '@agent-action-runner/express';
+
+const app = express();
+const runner = createRunner();
+
+app.use('/agent-runner', createExpressAdapter(runner, {
+  getUserId: (req) => req.header('x-user-id') ?? 'user_1',
+}));
+```
+
+## Fastify Quickstart
+
+```bash
+npm install @agent-action-runner/core @agent-action-runner/http @agent-action-runner/fastify fastify zod
+```
+
+```ts
+import Fastify from 'fastify';
+import { createRunner } from '@agent-action-runner/core';
+import { agentRunnerFastifyPlugin } from '@agent-action-runner/fastify';
+
+const app = Fastify();
+const runner = createRunner();
+
+await app.register(agentRunnerFastifyPlugin, {
+  prefix: '/agent-runner',
+  runner,
+  getUserId: async (request) => request.headers['x-user-id']?.toString() ?? 'user_1',
+});
+```
+
+The HTTP adapters expose `GET /actions`, `POST /actions/:name/execute`, and `POST /workflows/execute`. Server-side resolver hooks control user identity, allowed modes, approval tokens, approval context, and metadata.
+
 ## Mutate Approval Model
 
 `mutate` actions are blocked by default unless the execution explicitly allows `mutate` mode and the configured approval hook approves the request.
@@ -183,6 +229,9 @@ Actual publishing is intentionally manual:
 ```bash
 npm publish --workspace @agent-action-runner/core --access public
 npm publish --workspace @agent-action-runner/nestjs --access public
+npm publish --workspace @agent-action-runner/http --access public
+npm publish --workspace @agent-action-runner/express --access public
+npm publish --workspace @agent-action-runner/fastify --access public
 ```
 
 ## License
