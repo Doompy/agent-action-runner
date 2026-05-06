@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.4.2] - 2026-05-06
+
+### Added
+
+- Added CLI runner module loading for compiled ESM runner modules that export `runner` or default export an `AgentActionRunner` instance.
+- Added `workflow:run` for local read/draft/dryRun workflow smoke-runs, with explicit `--allow-mutate` opt-in for mutate mode.
+- Added `mcp:serve` to expose a compiled runner module through MCP stdio for local development.
+- Added real-runner `mcp:preview --runner <path>` support using `@agent-action-runner/mcp` diagnostics.
+- Added `examples/cli-basic` with a compiled runner module and sample CLI workflows.
+
+### Changed
+
+- Bumped `@agent-action-runner/cli` to `0.4.2`.
+
+### Notes
+
+- CLI runner module loading supports compiled ESM JavaScript only. TypeScript config loading and framework auto-discovery remain out of scope.
+- `@modelcontextprotocol/sdk` is a peer dependency of `@agent-action-runner/cli` for `mcp:serve`.
+
 ## [0.4.1] - 2026-05-06
 
 ### Added

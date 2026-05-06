@@ -1,0 +1,22 @@
+{
+  "workflowName": "retry-failed-delivery-jobs",
+  "steps": [
+    {
+      "id": "jobs",
+      "action": "delivery.searchJobs",
+      "input": {
+        "status": ["FAILED"]
+      }
+    },
+    {
+      "id": "dryRun",
+      "action": "delivery.dryRunRetry",
+      "input": {
+        "jobIds": {
+          "$fromStep": "jobs",
+          "path": "/jobIds"
+        }
+      }
+    }
+  ]
+}

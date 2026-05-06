@@ -43,9 +43,9 @@ This project is focused on a safety boundary between agents and TypeScript backe
 
 ## v0.4.2
 
-- Add CLI runner module loading for local workflow smoke-runs.
-- Add CLI `mcp:serve` for stdio MCP export from a compiled runner module.
-- Keep mutate blocked by default and require explicit local opt-in.
+- Added CLI runner module loading for local workflow smoke-runs.
+- Added CLI `mcp:serve` for stdio MCP export from a compiled runner module.
+- Kept mutate blocked by default and requiring explicit local opt-in.
 
 ## v0.5.0
 

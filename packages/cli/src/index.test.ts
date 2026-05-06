@@ -2,8 +2,11 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRunner } from '@agent-action-runner/core';
+import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
-import { runCli } from './index.js';
+import { createMcpServerForCli, runCli } from './index.js';
 
 describe('@agent-action-runner/cli manifest commands', () => {
   it('init creates config, manifest, and example workflow', async () => {
@@ -113,6 +116,125 @@ describe('@agent-action-runner/cli manifest commands', () => {
   });
 });
 
+describe('@agent-action-runner/cli runner module commands', () => {
+  it('imports a runner from named runner export and runs a workflow', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+    const workflowPath = await writeWorkflow(cwd, 'double.workflow.json', {
+      workflowName: 'double',
+      steps: [
+        {
+          id: 'double',
+          action: 'math.double',
+          input: { value: 2 },
+        },
+      ],
+    });
+
+    const result = await runTestCli(cwd, [
+      'workflow:run',
+      workflowPath,
+      '--runner',
+      runnerPath,
+      '--user-id',
+      'dev_user',
+      '--metadata-json',
+      '{"source":"test"}',
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout).outputByStep.double).toEqual({ value: 4 });
+  });
+
+  it('imports a runner from default export', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'default' });
+    const workflowPath = await writeWorkflow(cwd, 'search.workflow.json', {
+      workflowName: 'search',
+      steps: [
+        {
+          id: 'jobs',
+          action: 'delivery.searchJobs',
+          input: { status: ['FAILED'] },
+        },
+      ],
+    });
+
+    const result = await runTestCli(cwd, ['workflow:run', workflowPath, '--runner', runnerPath]);
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout).outputByStep.jobs).toEqual({ jobIds: ['job_1'] });
+  });
+
+  it('blocks mutate workflows by default and allows them with explicit opt-in', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+    const workflowPath = await writeWorkflow(cwd, 'mutate.workflow.json', {
+      workflowName: 'mutate',
+      steps: [
+        {
+          id: 'retry',
+          action: 'delivery.executeRetry',
+          input: { jobIds: ['job_1'] },
+        },
+      ],
+    });
+
+    const blocked = await runTestCli(cwd, ['workflow:run', workflowPath, '--runner', runnerPath]);
+    expect(blocked.exitCode).toBe(1);
+    expect(blocked.stderr).toContain('not allowed');
+
+    const allowed = await runTestCli(cwd, [
+      'workflow:run',
+      workflowPath,
+      '--runner',
+      runnerPath,
+      '--allow-mutate',
+    ]);
+    expect(allowed.exitCode).toBe(0);
+    expect(JSON.parse(allowed.stdout).outputByStep.retry).toEqual({ retried: 1 });
+  });
+
+  it('uses a real runner for MCP preview when --runner is supplied', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+
+    const result = await runTestCli(cwd, ['mcp:preview', '--runner', runnerPath, '--json']);
+
+    expect(result.exitCode).toBe(0);
+    const tools = JSON.parse(result.stdout).tools;
+    expect(tools).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        actionName: 'math.double',
+        exported: true,
+        toolName: 'math_double',
+      }),
+      expect.objectContaining({
+        actionName: 'delivery.executeRetry',
+        exported: false,
+        reason: 'mutationNotExposed',
+      }),
+    ]));
+  });
+
+  it('creates an MCP server helper without binding stdio', async () => {
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'math.double',
+      mode: 'read',
+      inputSchema: z.object({ value: z.number() }),
+      handler: (input) => ({ value: input.value * 2 }),
+    });
+
+    const server = await createMcpServerForCli({
+      runner,
+      userId: 'dev_user',
+    });
+
+    expect(server).toBeTruthy();
+  });
+});
+
 async function createInitializedProject(): Promise<string> {
   const cwd = await createTempDir();
   const result = await runTestCli(cwd, ['init']);
@@ -143,4 +265,67 @@ async function runTestCli(cwd: string, argv: readonly string[]) {
     stderr,
     stdout,
   };
+}
+
+async function writeWorkflow(cwd: string, name: string, workflow: unknown): Promise<string> {
+  const workflowPath = path.join(cwd, name);
+  await writeFile(workflowPath, JSON.stringify(workflow, null, 2), 'utf8');
+  return workflowPath;
+}
+
+async function writeRunnerModule(
+  cwd: string,
+  options: {
+    readonly exportStyle: 'default' | 'named';
+  },
+): Promise<string> {
+  const runnerPath = path.join(cwd, `runner-${options.exportStyle}.mjs`);
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const coreImport = pathToFileURL(path.join(repoRoot, 'packages', 'core', 'dist', 'index.js')).href;
+  const exportStatement = options.exportStyle === 'named'
+    ? 'export { runner };'
+    : 'export default runner;';
+  await writeFile(runnerPath, `
+import { createRunner } from '${coreImport}';
+
+const objectSchema = {
+  safeParse: (value) => ({ success: true, data: value }),
+  toJSONSchema: () => ({ type: 'object', additionalProperties: true }),
+};
+
+const runner = createRunner({
+  approval: () => ({ approved: true, approvalId: 'approval_test' }),
+});
+
+runner.registerAction({
+  name: 'math.double',
+  mode: 'read',
+  description: 'Double a number.',
+  inputSchema: objectSchema,
+  outputSchema: objectSchema,
+  handler: (input) => ({ value: input.value * 2 }),
+});
+
+runner.registerAction({
+  name: 'delivery.searchJobs',
+  mode: 'read',
+  description: 'Search delivery jobs.',
+  inputSchema: objectSchema,
+  outputSchema: objectSchema,
+  handler: () => ({ jobIds: ['job_1'] }),
+});
+
+runner.registerAction({
+  name: 'delivery.executeRetry',
+  mode: 'mutate',
+  description: 'Retry approved jobs.',
+  approvalRequired: true,
+  inputSchema: objectSchema,
+  outputSchema: objectSchema,
+  handler: (input) => ({ retried: input.jobIds.length }),
+});
+
+${exportStatement}
+`, 'utf8');
+  return runnerPath;
 }

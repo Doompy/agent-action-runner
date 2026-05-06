@@ -1,0 +1,19 @@
+{
+  "name": "agent-action-runner-cli-basic-example",
+  "version": "0.4.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prebuild": "npm run build --workspace @agent-action-runner/core --if-present",
+    "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "npm run build --workspace @agent-action-runner/core --if-present",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@agent-action-runner/core": "file:../../packages/core",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@agent-action-runner/cli": "file:../../packages/cli"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "manifest": "./.agent-runner/actions.json",
+  "runner": "./dist/agent-runner.js",
+  "workflowsDir": "./workflows",
+  "mcp": {
+    "exposeModes": ["read", "draft", "dryRun"],
+    "exposeMutations": false
+  }
+}

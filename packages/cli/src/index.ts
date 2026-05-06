@@ -3,7 +3,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { ActionMode, WorkflowValidationAction } from '@agent-action-runner/core';
+import type {
+  ActionMode,
+  AgentActionRunner,
+  WorkflowDefinition,
+  WorkflowValidationAction,
+} from '@agent-action-runner/core';
 import { validateWorkflowDefinition } from '@agent-action-runner/core';
 
 const DEFAULT_CONFIG_FILE = 'agent-runner.config.json';
@@ -62,7 +67,7 @@ type McpPreviewEntry = {
   readonly approvalRequired: boolean;
   readonly exported: boolean;
   readonly toolName?: string;
-  readonly reason?: 'modeNotExposed' | 'mutationNotExposed' | 'schemaMissing';
+  readonly reason?: 'modeNotExposed' | 'mutationNotExposed' | 'schemaMissing' | 'schemaNotSerializable';
 };
 
 type DoctorWarning = {
@@ -109,8 +114,13 @@ export async function runCli(options: CliOptions): Promise<number> {
         return 0;
       case 'workflow:validate':
         return await runWorkflowValidate(context, parseArgs(rest));
+      case 'workflow:run':
+        return await runWorkflowRun(context, parseArgs(rest));
       case 'mcp:preview':
         await runMcpPreview(context, parseArgs(rest));
+        return 0;
+      case 'mcp:serve':
+        await runMcpServe(context, parseArgs(rest));
         return 0;
       case 'doctor':
         return await runDoctor(context, parseArgs(rest));
@@ -121,7 +131,7 @@ export async function runCli(options: CliOptions): Promise<number> {
         throw new CliError(`Unknown command "${command}".`);
     }
   } catch (error) {
-    context.stderr(`${error instanceof Error ? error.message : String(error)}\n`);
+    context.stderr(`${formatCliError(error)}\n`);
     return 1;
   }
 }
@@ -227,14 +237,45 @@ async function runWorkflowValidate(context: CommandContext, args: ParsedArgs): P
   return result.valid ? 0 : 1;
 }
 
+async function runWorkflowRun(context: CommandContext, args: ParsedArgs): Promise<number> {
+  const workflowFile = args.positionals[0];
+  if (!workflowFile) {
+    throw new CliError('workflow:run requires a workflow JSON file.');
+  }
+
+  const config = await loadConfig(context, args);
+  const runner = await loadRunner(context, args, config);
+  const workflow = await readJsonFile(resolvePath(context.cwd, workflowFile));
+  const validation = validateWorkflowDefinition(workflow, {
+    actions: toValidationActionsFromRunner(runner),
+  });
+  if (!validation.valid) {
+    for (const issue of validation.issues) {
+      context.stderr(`${issue.code}${issue.path ? ` at ${issue.path}` : ''}: ${issue.message}\n`);
+    }
+    return 1;
+  }
+
+  const result = await runner.executeWorkflow({
+    userId: resolveCliUserId(context, args),
+    workflow: workflow as WorkflowDefinition,
+    allowedModes: resolveWorkflowRunAllowedModes(args),
+    metadata: parseMetadataJson(args),
+  });
+
+  writeJson(context, result);
+  return 0;
+}
+
 async function runMcpPreview(context: CommandContext, args: ParsedArgs): Promise<void> {
   const config = await loadConfig(context, args);
-  const manifest = await loadManifest(context, args, config);
   const exposeMutations = args.flags.has('expose-mutations') || config.mcp.exposeMutations;
-  const report = createManifestMcpPreview(manifest, {
-    exposeModes: config.mcp.exposeModes,
-    exposeMutations,
-  });
+  const report = args.options.runner
+    ? await createRunnerMcpPreview(context, args, config, exposeMutations)
+    : createManifestMcpPreview(await loadManifest(context, args, config), {
+      exposeModes: config.mcp.exposeModes,
+      exposeMutations,
+    });
 
   if (args.flags.has('json')) {
     writeJson(context, { tools: report });
@@ -253,6 +294,70 @@ async function runMcpPreview(context: CommandContext, args: ParsedArgs): Promise
       context.stdout(`- ${entry.actionName} reason: ${entry.reason}\n`);
     }
   }
+}
+
+async function runMcpServe(context: CommandContext, args: ParsedArgs): Promise<void> {
+  const config = await loadConfig(context, args);
+  const runner = await loadRunner(context, args, config);
+  const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js');
+  const server = await createMcpServerForCli({
+    config,
+    exposeMutations: args.flags.has('expose-mutations') || config.mcp.exposeMutations,
+    runner,
+    userId: resolveCliUserId(context, args),
+  });
+
+  await server.connect(new StdioServerTransport());
+}
+
+export async function createMcpServerForCli(input: {
+  readonly config?: AgentRunnerCliConfig;
+  readonly exposeMutations?: boolean;
+  readonly runner: AgentActionRunner;
+  readonly userId: string;
+}) {
+  const { createMcpExporter } = await import('@agent-action-runner/mcp');
+  const config = input.config ?? DEFAULT_CONFIG;
+
+  return createMcpExporter(input.runner, {
+    exposeModes: config.mcp.exposeModes,
+    exposeMutations: input.exposeMutations ?? config.mcp.exposeMutations,
+    getUserId: () => input.userId,
+  });
+}
+
+async function createRunnerMcpPreview(
+  context: CommandContext,
+  args: ParsedArgs,
+  config: AgentRunnerCliConfig,
+  exposeMutations: boolean,
+): Promise<readonly McpPreviewEntry[]> {
+  const runner = await loadRunner(context, args, config);
+  const { createMcpToolReport } = await import('@agent-action-runner/mcp');
+
+  return createMcpToolReport(runner, {
+    exposeModes: config.mcp.exposeModes,
+    exposeMutations,
+    getUserId: () => resolveCliUserId(context, args),
+  }).map((entry) => {
+    if (entry.exported) {
+      return {
+        actionName: entry.actionName,
+        approvalRequired: entry.approvalRequired,
+        exported: true,
+        mode: entry.mode,
+        toolName: entry.name,
+      };
+    }
+
+    return {
+      actionName: entry.actionName,
+      approvalRequired: entry.approvalRequired,
+      exported: false,
+      mode: entry.mode,
+      reason: entry.skipReason,
+    };
+  });
 }
 
 async function runDoctor(context: CommandContext, args: ParsedArgs): Promise<number> {
@@ -410,11 +515,12 @@ async function loadConfig(context: CommandContext, args: ParsedArgs): Promise<Ag
     throw new CliError('CLI config must be a JSON object.');
   }
 
+  const configDir = path.dirname(configPath);
   const mcp = isRecord(raw.mcp) ? raw.mcp : {};
   return {
-    manifest: typeof raw.manifest === 'string' ? raw.manifest : DEFAULT_CONFIG.manifest,
-    runner: typeof raw.runner === 'string' ? raw.runner : DEFAULT_CONFIG.runner,
-    workflowsDir: typeof raw.workflowsDir === 'string' ? raw.workflowsDir : DEFAULT_CONFIG.workflowsDir,
+    manifest: resolveConfigPath(configDir, raw.manifest, DEFAULT_CONFIG.manifest),
+    runner: resolveConfigPath(configDir, raw.runner, DEFAULT_CONFIG.runner),
+    workflowsDir: resolveConfigPath(configDir, raw.workflowsDir, DEFAULT_CONFIG.workflowsDir),
     mcp: {
       exposeModes: parseExposeModes(mcp.exposeModes),
       exposeMutations: typeof mcp.exposeMutations === 'boolean'
@@ -422,6 +528,11 @@ async function loadConfig(context: CommandContext, args: ParsedArgs): Promise<Ag
         : DEFAULT_CONFIG.mcp.exposeMutations,
     },
   };
+}
+
+function resolveConfigPath(configDir: string, value: unknown, fallback: string): string {
+  const candidate = typeof value === 'string' ? value : fallback;
+  return path.isAbsolute(candidate) ? candidate : path.resolve(configDir, candidate);
 }
 
 async function loadManifest(
@@ -469,6 +580,71 @@ function toValidationActions(manifest: ActionManifest): readonly WorkflowValidat
   }));
 }
 
+function toValidationActionsFromRunner(runner: AgentActionRunner): readonly WorkflowValidationAction[] {
+  return runner.listActions().map((action) => ({
+    name: action.name,
+    mode: action.mode,
+  }));
+}
+
+async function loadRunner(
+  context: CommandContext,
+  args: ParsedArgs,
+  config: AgentRunnerCliConfig,
+): Promise<AgentActionRunner> {
+  const runnerPath = resolvePath(context.cwd, args.options.runner ?? config.runner);
+  const module = await import(pathToFileURL(runnerPath).href);
+  const candidate = isRecord(module) && 'runner' in module
+    ? module.runner
+    : isRecord(module) && 'default' in module
+      ? module.default
+      : undefined;
+
+  if (!isAgentRunner(candidate)) {
+    throw new CliError('Runner module must export `runner` or default AgentActionRunner instance.');
+  }
+
+  return candidate;
+}
+
+function isAgentRunner(value: unknown): value is AgentActionRunner {
+  return isRecord(value)
+    && typeof value.executeAction === 'function'
+    && typeof value.executeWorkflow === 'function'
+    && typeof value.getAction === 'function'
+    && typeof value.listActions === 'function';
+}
+
+function resolveCliUserId(context: CommandContext, args: ParsedArgs): string {
+  return args.options['user-id'] ?? context.env.AGENT_RUNNER_USER_ID ?? 'local_user';
+}
+
+function resolveWorkflowRunAllowedModes(args: ParsedArgs): readonly ActionMode[] {
+  return args.flags.has('allow-mutate')
+    ? [...DEFAULT_ALLOWED_MODES, 'mutate']
+    : DEFAULT_ALLOWED_MODES;
+}
+
+function parseMetadataJson(args: ParsedArgs): Readonly<Record<string, unknown>> | undefined {
+  const raw = args.options['metadata-json'];
+  if (!raw) {
+    return undefined;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new CliError(`--metadata-json must be valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  if (!isRecord(parsed)) {
+    throw new CliError('--metadata-json must be a JSON object.');
+  }
+
+  return parsed;
+}
+
 function parseExposeModes(value: unknown): readonly ActionMode[] {
   if (!Array.isArray(value)) {
     return DEFAULT_CONFIG.mcp.exposeModes;
@@ -493,7 +669,7 @@ function parseArgs(args: readonly string[]): ParsedArgs {
     }
 
     const name = arg.slice(2);
-    if (name === 'config' || name === 'out') {
+    if (name === 'config' || name === 'metadata-json' || name === 'out' || name === 'runner' || name === 'user-id') {
       const value = args[index + 1];
       if (!value) {
         throw new CliError(`--${name} requires a value.`);
@@ -651,11 +827,26 @@ function writeHelp(context: CommandContext): void {
     '  actions:list',
     '  actions:inspect <actionName>',
     '  workflow:validate <file>',
+    '  workflow:run <file>',
     '  mcp:preview',
+    '  mcp:serve',
     '  doctor',
     '  docs:generate',
     '',
   ].join('\n'));
+}
+
+function formatCliError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const cause = error.cause;
+  if (cause instanceof Error) {
+    return `${error.message}\nCaused by: ${cause.message}`;
+  }
+
+  return error.message;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

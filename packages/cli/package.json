@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/cli",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "CLI for Agent Action Runner local development, manifest inspection, workflow validation, and MCP previews.",
   "license": "Apache-2.0",
   "author": "Doompy",
@@ -55,17 +55,23 @@
   "sideEffects": false,
   "scripts": {
     "prepack": "npm run build",
-    "prebuild": "npm run build --workspace @agent-action-runner/core --if-present",
+    "prebuild": "npm run build --workspace @agent-action-runner/mcp --if-present",
     "build": "tsc -p tsconfig.build.json",
-    "pretest": "npm run build --workspace @agent-action-runner/core --if-present",
+    "pretest": "npm run build --workspace @agent-action-runner/mcp --if-present",
     "test": "vitest run",
-    "pretypecheck": "npm run build --workspace @agent-action-runner/core --if-present",
+    "pretypecheck": "npm run build --workspace @agent-action-runner/mcp --if-present",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@agent-action-runner/core": "file:../core"
+    "@agent-action-runner/core": "^0.4.1",
+    "@agent-action-runner/mcp": "^0.4.0",
+    "zod": "^3.25.0 || ^4.0.0"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "vitest": "^4.0.14"
   }
 }
