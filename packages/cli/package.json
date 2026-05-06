@@ -1,12 +1,15 @@
 {
-  "name": "@agent-action-runner/core",
+  "name": "@agent-action-runner/cli",
   "version": "0.4.1",
-  "description": "Agent-safe action and workflow runner core for TypeScript backends with schema validation, approval, and audit.",
+  "description": "CLI for Agent Action Runner local development, manifest inspection, workflow validation, and MCP previews.",
   "license": "Apache-2.0",
   "author": "Doompy",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "agent-action-runner": "./dist/index.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -20,7 +23,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Doompy/agent-action-runner.git",
-    "directory": "packages/core"
+    "directory": "packages/cli"
   },
   "homepage": "https://github.com/Doompy/agent-action-runner#readme",
   "bugs": {
@@ -52,15 +55,17 @@
   "sideEffects": false,
   "scripts": {
     "prepack": "npm run build",
+    "prebuild": "npm run build --workspace @agent-action-runner/core --if-present",
     "build": "tsc -p tsconfig.build.json",
+    "pretest": "npm run build --workspace @agent-action-runner/core --if-present",
     "test": "vitest run",
+    "pretypecheck": "npm run build --workspace @agent-action-runner/core --if-present",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-  "peerDependencies": {
-    "zod": "^3.25.0 || ^4.0.0"
+  "dependencies": {
+    "@agent-action-runner/core": "file:../core"
   },
   "devDependencies": {
-    "zod": "^4.1.13",
     "vitest": "^4.0.14"
   }
 }

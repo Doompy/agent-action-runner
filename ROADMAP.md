@@ -34,6 +34,19 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Improved input/output inference for registered actions.
 - Kept the builder as JSON Workflow generation, not arbitrary TypeScript execution.
 
+## v0.4.1
+
+- Add the first CLI package for manifest-based local inspection.
+- Validate workflow JSON before execution.
+- Generate action docs and preview MCP exports from an action manifest.
+- Keep CLI config JSON-only and avoid framework auto-discovery.
+
+## v0.4.2
+
+- Add CLI runner module loading for local workflow smoke-runs.
+- Add CLI `mcp:serve` for stdio MCP export from a compiled runner module.
+- Keep mutate blocked by default and require explicit local opt-in.
+
 ## v0.5.0
 
 - Add persistent audit examples.

@@ -11,6 +11,10 @@ export {
   registerActionCatalog,
 } from './builder.js';
 
+export {
+  validateWorkflowDefinition,
+} from './validation.js';
+
 export type {
   ActionDefinition,
   ActionExecutionEvent,
@@ -47,11 +51,20 @@ export type {
   WorkflowStepOptions,
 } from './builder.js';
 
+export type {
+  WorkflowValidationAction,
+  WorkflowValidationIssue,
+  WorkflowValidationIssueCode,
+  WorkflowValidationOptions,
+  WorkflowValidationResult,
+} from './validation.js';
+
 export {
   AgentActionRunnerError,
   ActionAlreadyRegisteredError,
   ActionNotFoundError,
   ApprovalRequiredError,
+  DuplicateWorkflowStepError,
   InvalidStepReferenceError,
   ModeNotAllowedError,
   PolicyRejectedError,

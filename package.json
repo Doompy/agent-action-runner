@@ -1,6 +1,6 @@
 {
   "name": "agent-action-runner",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Agent-safe action and workflow runner for TypeScript backends with schema validation, approval, audit, and MCP export support.",
   "license": "Apache-2.0",
@@ -41,7 +41,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "pack:check": "npm pack --workspace @agent-action-runner/core --dry-run && npm pack --workspace @agent-action-runner/nestjs --dry-run && npm pack --workspace @agent-action-runner/http --dry-run && npm pack --workspace @agent-action-runner/express --dry-run && npm pack --workspace @agent-action-runner/fastify --dry-run && npm pack --workspace @agent-action-runner/mcp --dry-run",
+    "pack:check": "npm pack --workspace @agent-action-runner/core --dry-run && npm pack --workspace @agent-action-runner/nestjs --dry-run && npm pack --workspace @agent-action-runner/http --dry-run && npm pack --workspace @agent-action-runner/express --dry-run && npm pack --workspace @agent-action-runner/fastify --dry-run && npm pack --workspace @agent-action-runner/mcp --dry-run && npm pack --workspace @agent-action-runner/cli --dry-run",
     "pretest": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "pretypecheck": "npm run build --workspace @agent-action-runner/core --if-present",

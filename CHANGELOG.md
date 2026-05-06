@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.4.1] - 2026-05-06
+
+### Added
+
+- Added `@agent-action-runner/cli` with manifest-based local development commands: `init`, `actions:list`, `actions:inspect`, `workflow:validate`, `mcp:preview`, `doctor`, and `docs:generate`.
+- Added `validateWorkflowDefinition()` to `@agent-action-runner/core` for static JSON workflow checks.
+- Added workflow validation issue types and stable issue codes for duplicate steps, unknown actions, invalid modes, invalid references, and invalid input values.
+
+### Changed
+
+- Bumped `@agent-action-runner/core` to `0.4.1`.
+- Added a runtime duplicate step guard to the workflow builder.
+- Added `@agent-action-runner/cli` to package dry-run checks.
+
+### Notes
+
+- The CLI is a local/dev inspection and smoke-run helper. It does not auto-discover framework code or replace application auth, approval, and audit controls.
+
 ## [0.4.0] - 2026-05-06
 
 ### Added

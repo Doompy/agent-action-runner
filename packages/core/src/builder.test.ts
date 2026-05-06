@@ -6,6 +6,7 @@ import {
   defineActionCatalog,
   defineWorkflow,
   registerActionCatalog,
+  DuplicateWorkflowStepError,
 } from './index.js';
 
 const actions = defineActionCatalog({
@@ -98,6 +99,18 @@ describe('workflow builder', () => {
       retryable: ['job_1', 'job_2'],
       blocked: [],
     });
+  });
+
+  it('throws when a duplicate step id is added at runtime', () => {
+    const builder = defineWorkflow('duplicate-steps')
+      .step('jobs', actions.searchJobs, {
+        status: ['FAILED'],
+      });
+
+    expect(() => (builder as any)
+      .step('jobs', actions.searchJobs, {
+        status: ['FAILED'],
+      })).toThrow(DuplicateWorkflowStepError);
   });
 });
 

@@ -30,6 +30,7 @@ This repository starts with a framework-agnostic core package and first-party fr
 @agent-action-runner/express
 @agent-action-runner/fastify
 @agent-action-runner/mcp
+@agent-action-runner/cli
 ```
 
 Before publishing these packages, the `@agent-action-runner` npm organization/scope must exist and the publisher must have access to it.
@@ -149,6 +150,20 @@ const workflow = defineWorkflow('retry-failed-jobs')
 ```
 
 The builder does not execute TypeScript. It only creates a `WorkflowDefinition` for the existing JSON workflow runner.
+
+## CLI Quickstart
+
+The CLI is for local development: inspect action manifests, validate workflow JSON, preview MCP exports, and generate action docs.
+
+```bash
+npx @agent-action-runner/cli init
+npx @agent-action-runner/cli actions:list
+npx @agent-action-runner/cli workflow:validate ./agent-workflows/example.workflow.json
+npx @agent-action-runner/cli mcp:preview
+npx @agent-action-runner/cli doctor
+```
+
+The v0.4.1 CLI reads `agent-runner.config.json` and `.agent-runner/actions.json`. It does not auto-discover NestJS decorators, Express routes, Fastify plugins, or TypeScript source.
 
 ## NestJS Quickstart
 

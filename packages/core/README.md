@@ -132,6 +132,27 @@ The generated workflow is ordinary JSON workflow data:
 }
 ```
 
+## Workflow Validation
+
+Use `validateWorkflowDefinition()` when you want to check workflow JSON before handing it to the runner.
+
+```ts
+import { validateWorkflowDefinition } from '@agent-action-runner/core';
+
+const result = validateWorkflowDefinition(workflow, {
+  actions: [
+    { name: 'delivery.searchJobs', mode: 'read' },
+    { name: 'delivery.dryRunRetry', mode: 'dryRun' },
+  ],
+});
+
+if (!result.valid) {
+  console.log(result.issues);
+}
+```
+
+Validation catches duplicate step ids, unknown actions, invalid modes, references to future or missing steps, and unsupported input values.
+
 ## Approval
 
 `mutate` actions require explicit mode allowance and approval hook approval. The approval hook receives an `approvalContext` with `userId`, `actionName`, `mode`, deterministic `inputHash`, and optional `resourceIds`, `dryRunHash`, `expiresAt`, `workflowId`, and `stepId`.

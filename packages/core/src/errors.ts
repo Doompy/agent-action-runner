@@ -48,6 +48,12 @@ export class InvalidStepReferenceError extends AgentActionRunnerError {
   }
 }
 
+export class DuplicateWorkflowStepError extends AgentActionRunnerError {
+  constructor(stepId: string) {
+    super(`Workflow step "${stepId}" is already defined.`);
+  }
+}
+
 export class WorkflowExecutionError extends AgentActionRunnerError {
   constructor(stepId: string, actionName: string, cause: unknown) {
     super(`Workflow step "${stepId}" failed while executing action "${actionName}".`);

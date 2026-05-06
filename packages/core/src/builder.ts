@@ -1,3 +1,4 @@
+import { DuplicateWorkflowStepError } from './errors.js';
 import { fromStep as createStepReference } from './references.js';
 import type { AgentActionRunner } from './runner.js';
 import type {
@@ -92,6 +93,10 @@ class WorkflowBuilderImpl {
     ) => WorkflowInputFor<unknown>),
     options: WorkflowStepOptions = {},
   ): WorkflowBuilder {
+    if (this.steps.some((step) => step.id === id)) {
+      throw new DuplicateWorkflowStepError(id);
+    }
+
     const resolvedInput = typeof input === 'function'
       ? input({ fromStep: createStepReference })
       : input;
