@@ -1,6 +1,6 @@
 {
   "name": "agent-action-runner",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "private": true,
   "description": "Agent-safe action and workflow runner for TypeScript backends with schema validation, approval, audit, and MCP export support.",
   "license": "Apache-2.0",
@@ -41,6 +41,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "cli:smoke": "npm run build --workspace @agent-action-runner/cli --if-present && npm run build --workspace agent-action-runner-cli-basic-example --if-present && node packages/cli/dist/index.js actions:list --config examples/cli-basic/agent-runner.config.json && node packages/cli/dist/index.js workflow:validate examples/cli-basic/workflows/retry-failed.workflow.json --config examples/cli-basic/agent-runner.config.json && node packages/cli/dist/index.js workflow:validate examples/cli-basic/workflows/retry-failed.workflow.json --config examples/cli-basic/agent-runner.config.json --runner examples/cli-basic/dist/agent-runner.js --format json && node packages/cli/dist/index.js workflow:run examples/cli-basic/workflows/retry-failed.workflow.json --config examples/cli-basic/agent-runner.config.json --runner examples/cli-basic/dist/agent-runner.js && node packages/cli/dist/index.js mcp:preview --config examples/cli-basic/agent-runner.config.json --runner examples/cli-basic/dist/agent-runner.js --json",
     "pack:check": "npm pack --workspace @agent-action-runner/core --dry-run && npm pack --workspace @agent-action-runner/nestjs --dry-run && npm pack --workspace @agent-action-runner/http --dry-run && npm pack --workspace @agent-action-runner/express --dry-run && npm pack --workspace @agent-action-runner/fastify --dry-run && npm pack --workspace @agent-action-runner/mcp --dry-run && npm pack --workspace @agent-action-runner/cli --dry-run",
     "pretest": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

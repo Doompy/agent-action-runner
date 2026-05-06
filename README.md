@@ -159,6 +159,7 @@ The CLI is for local development: inspect action manifests, validate workflow JS
 npx @agent-action-runner/cli init
 npx @agent-action-runner/cli actions:list
 npx @agent-action-runner/cli workflow:validate ./agent-workflows/example.workflow.json
+npx @agent-action-runner/cli workflow:validate ./agent-workflows/example.workflow.json --runner ./dist/agent-runner.js --format json
 npx @agent-action-runner/cli workflow:run ./agent-workflows/example.workflow.json --runner ./dist/agent-runner.js
 npx @agent-action-runner/cli mcp:preview
 npx @agent-action-runner/cli mcp:serve --runner ./dist/agent-runner.js
@@ -169,6 +170,8 @@ npx @agent-action-runner/cli doctor
 The CLI reads `agent-runner.config.json` and `.agent-runner/actions.json`. Runner module commands use compiled ESM JavaScript and expect the module to export `runner` or default export an `AgentActionRunner` instance. It does not auto-discover NestJS decorators, Express routes, Fastify plugins, or TypeScript source.
 
 See [examples/cli-basic](./examples/cli-basic) for a local runner module, sample workflow, and MCP preview flow.
+
+The intended local loop is: compile a dev runner module, export/inspect actions, validate workflow JSON, run read/dryRun smoke workflows, then preview or serve MCP tools.
 
 ## NestJS Quickstart
 

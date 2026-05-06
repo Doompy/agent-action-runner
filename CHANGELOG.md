@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.4.4] - 2026-05-06
+
+### Added
+
+- Added `workflow:validate --runner <file>` so workflow validation can use the actual runner action catalog.
+- Added `--format json` as a clearer JSON output alias alongside the existing `--json` flag.
+- Added a root `cli:smoke` script and CI step that exercise the CLI basic example end to end.
+
+### Changed
+
+- Bumped `@agent-action-runner/cli` to `0.4.4`.
+- Hardened CLI docs around the local runner loop and runner-based validation.
+
 ## [0.4.3] - 2026-05-06
 
 ### Added

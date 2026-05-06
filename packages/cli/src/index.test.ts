@@ -43,6 +43,10 @@ describe('@agent-action-runner/cli manifest commands', () => {
       name: 'delivery.searchJobs',
       mode: 'read',
     });
+
+    const formatted = await runTestCli(cwd, ['actions:list', '--format', 'json']);
+    expect(formatted.exitCode).toBe(0);
+    expect(JSON.parse(formatted.stdout).actions).toHaveLength(3);
   });
 
   it('validates workflow files with manifest actions and step references', async () => {
@@ -164,6 +168,32 @@ describe('@agent-action-runner/cli runner module commands', () => {
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.stdout).outputByStep.jobs).toEqual({ jobIds: ['job_1'] });
+  });
+
+  it('validates workflows against a real runner when --runner is supplied', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+    const workflowPath = await writeWorkflow(cwd, 'validate-runner.workflow.json', {
+      workflowName: 'validate-runner',
+      steps: [
+        {
+          id: 'double',
+          action: 'math.double',
+          input: { value: 4 },
+        },
+      ],
+    });
+
+    const valid = await runTestCli(cwd, [
+      'workflow:validate',
+      workflowPath,
+      '--runner',
+      runnerPath,
+      '--format',
+      'json',
+    ]);
+    expect(valid.exitCode).toBe(0);
+    expect(JSON.parse(valid.stdout).valid).toBe(true);
   });
 
   it('blocks mutate workflows by default and allows them with explicit opt-in', async () => {

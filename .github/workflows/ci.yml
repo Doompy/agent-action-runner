@@ -41,5 +41,8 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: CLI smoke
+        run: npm run cli:smoke
+
       - name: Check package contents
         run: npm run pack:check

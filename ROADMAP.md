@@ -53,6 +53,12 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Added runner-based docs and doctor commands.
 - Reduced the need to maintain `.agent-runner/actions.json` manually.
 
+## v0.4.4
+
+- Added runner-backed workflow validation.
+- Added CLI smoke checks to CI.
+- Polished CLI output flags and local loop docs.
+
 ## v0.5.0
 
 - Add persistent audit examples.

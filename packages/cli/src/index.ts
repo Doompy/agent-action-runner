@@ -178,7 +178,7 @@ async function runInit(context: CommandContext, args: ParsedArgs): Promise<void>
 
 async function runActionsList(context: CommandContext, args: ParsedArgs): Promise<void> {
   const manifest = await loadActionManifestSource(context, args);
-  if (args.flags.has('json')) {
+  if (wantsJson(args)) {
     writeJson(context, { actions: manifest.actions });
     return;
   }
@@ -203,7 +203,7 @@ async function runActionsInspect(context: CommandContext, args: ParsedArgs): Pro
     throw new CliError(`Action "${actionName}" was not found in the manifest.`);
   }
 
-  if (args.flags.has('json')) {
+  if (wantsJson(args)) {
     writeJson(context, { action });
     return;
   }
@@ -235,13 +235,16 @@ async function runWorkflowValidate(context: CommandContext, args: ParsedArgs): P
     throw new CliError('workflow:validate requires a workflow JSON file.');
   }
 
-  const manifest = await loadManifest(context, args);
+  const config = await loadConfig(context, args);
+  const validationActions = args.options.runner
+    ? toValidationActionsFromRunner(await loadRunner(context, args, config))
+    : toValidationActions(await loadManifest(context, args, config));
   const workflow = await readJsonFile(resolvePath(context.cwd, workflowFile));
   const result = validateWorkflowDefinition(workflow, {
-    actions: toValidationActions(manifest),
+    actions: validationActions,
   });
 
-  if (args.flags.has('json')) {
+  if (wantsJson(args)) {
     writeJson(context, result);
   } else if (result.valid) {
     context.stdout(`Workflow is valid: ${workflowFile}\n`);
@@ -295,7 +298,7 @@ async function runMcpPreview(context: CommandContext, args: ParsedArgs): Promise
       exposeMutations,
     });
 
-  if (args.flags.has('json')) {
+  if (wantsJson(args)) {
     writeJson(context, { tools: report });
     return;
   }
@@ -382,7 +385,7 @@ async function runDoctor(context: CommandContext, args: ParsedArgs): Promise<num
   const manifest = await loadActionManifestSource(context, args);
   const warnings = createDoctorWarnings(manifest);
 
-  if (args.flags.has('json')) {
+  if (wantsJson(args)) {
     writeJson(context, {
       ok: warnings.length === 0,
       warnings,
@@ -793,7 +796,14 @@ function parseArgs(args: readonly string[]): ParsedArgs {
     }
 
     const name = arg.slice(2);
-    if (name === 'config' || name === 'metadata-json' || name === 'out' || name === 'runner' || name === 'user-id') {
+    if (
+      name === 'config'
+      || name === 'format'
+      || name === 'metadata-json'
+      || name === 'out'
+      || name === 'runner'
+      || name === 'user-id'
+    ) {
       const value = args[index + 1];
       if (!value) {
         throw new CliError(`--${name} requires a value.`);
@@ -807,6 +817,23 @@ function parseArgs(args: readonly string[]): ParsedArgs {
   }
 
   return { positionals, flags, options };
+}
+
+function wantsJson(args: ParsedArgs): boolean {
+  const format = args.options.format;
+  if (!format) {
+    return args.flags.has('json');
+  }
+
+  if (format === 'json') {
+    return true;
+  }
+
+  if (format === 'text' || format === 'table') {
+    return false;
+  }
+
+  throw new CliError('--format must be one of: json, text, table.');
 }
 
 function createExampleManifest(): ActionManifest {
@@ -961,7 +988,7 @@ function writeHelp(context: CommandContext): void {
     '  actions:list',
     '  actions:inspect <actionName>',
     '  actions:export --runner <file>',
-    '  workflow:validate <file>',
+    '  workflow:validate <file> [--runner <file>]',
     '  workflow:run <file>',
     '  mcp:preview',
     '  mcp:serve',
