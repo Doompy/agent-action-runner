@@ -29,6 +29,7 @@ This repository starts with a framework-agnostic core package and first-party fr
 @agent-action-runner/http
 @agent-action-runner/express
 @agent-action-runner/fastify
+@agent-action-runner/mcp
 ```
 
 Before publishing these packages, the `@agent-action-runner` npm organization/scope must exist and the publisher must have access to it.
@@ -188,6 +189,37 @@ await app.register(agentRunnerFastifyPlugin, {
 
 The HTTP adapters expose `GET /actions`, `POST /actions/:name/execute`, and `POST /workflows/execute`. Server-side resolver hooks control user identity, allowed modes, approval tokens, approval context, and metadata.
 
+## MCP Quickstart
+
+```bash
+npm install @agent-action-runner/core @agent-action-runner/mcp @modelcontextprotocol/sdk zod
+```
+
+```ts
+import { createRunner } from '@agent-action-runner/core';
+import { createMcpExporter } from '@agent-action-runner/mcp';
+import { z } from 'zod';
+
+const runner = createRunner();
+
+runner.registerAction({
+  name: 'delivery.searchJobs',
+  mode: 'read',
+  inputSchema: z.object({
+    status: z.array(z.string()),
+  }),
+  handler: async (input) => {
+    return { jobIds: [`job_${input.status[0]}`] };
+  },
+});
+
+const mcpServer = createMcpExporter(runner, {
+  getUserId: () => 'user_1',
+});
+```
+
+The MCP exporter registers eligible actions as MCP tools. By default, only `read`, `draft`, and `dryRun` actions are exported. `mutate` actions require explicit opt-in and still go through core mode checks, approval hooks, and audit hooks.
+
 ## Operational Examples
 
 The admin ops examples show the intended safety model for operational mutations:
@@ -246,6 +278,7 @@ npm publish --workspace @agent-action-runner/nestjs --access public
 npm publish --workspace @agent-action-runner/http --access public
 npm publish --workspace @agent-action-runner/express --access public
 npm publish --workspace @agent-action-runner/fastify --access public
+npm publish --workspace @agent-action-runner/mcp --access public
 ```
 
 ## License

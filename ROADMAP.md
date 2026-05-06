@@ -10,7 +10,7 @@ This project is focused on a safety boundary between agents and TypeScript backe
 
 ## v0.3.0
 
-- Add `@agent-action-runner/mcp`.
+- Added `@agent-action-runner/mcp`.
 - Export registered actions as MCP tools.
 - Export read, draft, and dryRun actions by default.
 - Keep mutate export disabled unless explicitly configured.

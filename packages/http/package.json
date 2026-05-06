@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/http",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Shared HTTP utilities for agent-safe action and workflow runner adapters.",
   "license": "Apache-2.0",
   "author": "Doompy",
@@ -60,7 +60,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
-    "@agent-action-runner/core": "^0.2.0"
+    "@agent-action-runner/core": "^0.3.0"
   },
   "devDependencies": {
     "@agent-action-runner/core": "file:../core",

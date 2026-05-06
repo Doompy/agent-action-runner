@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.3.0] - 2026-05-06
+
+### Added
+
+- Added `@agent-action-runner/mcp`, an MCP exporter for registered Agent Action Runner actions.
+- Added `createMcpExporter()`, `registerMcpTools()`, and `createMcpToolCatalog()`.
+
+### Changed
+
+- Bumped public package versions to `0.3.0`.
+- Updated package dry-run checks and publish checklist to include `@agent-action-runner/mcp`.
+- Moved the Next.js adapter out of the near-term roadmap in favor of MCP compatibility.
+
+### Notes
+
+- The MCP exporter exposes `read`, `draft`, and `dryRun` actions by default.
+- `mutate` actions are not exported unless explicitly enabled and still require core approval handling.
+
 ## [0.2.3] - 2026-05-06
 
 ### Added
