@@ -4,6 +4,13 @@ export {
   fromStep,
 } from './runner.js';
 
+export {
+  defineAction,
+  defineActionCatalog,
+  defineWorkflow,
+  registerActionCatalog,
+} from './builder.js';
+
 export type {
   ActionDefinition,
   ActionExecutionEvent,
@@ -27,6 +34,18 @@ export type {
   WorkflowExecutionResult,
   WorkflowStep,
 } from './types.js';
+
+export type {
+  ActionCatalog,
+  ActionInput,
+  ActionOutput,
+  DefinedAction,
+  WorkflowBuilder,
+  WorkflowBuilderOutputs,
+  WorkflowBuilderStepContext,
+  WorkflowInputFor,
+  WorkflowStepOptions,
+} from './builder.js';
 
 export {
   AgentActionRunnerError,

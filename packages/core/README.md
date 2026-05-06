@@ -64,6 +64,74 @@ await runner.executeWorkflow({
 });
 ```
 
+## Workflow Builder
+
+The builder gives TypeScript checks for action inputs and previous step references while still producing the same JSON workflow definition.
+
+```ts
+import {
+  createRunner,
+  defineAction,
+  defineActionCatalog,
+  defineWorkflow,
+  registerActionCatalog,
+} from '@agent-action-runner/core';
+import { z } from 'zod';
+
+const runner = createRunner();
+const actions = defineActionCatalog({
+  searchJobs: defineAction({
+    name: 'delivery.searchJobs',
+    mode: 'read',
+    inputSchema: z.object({ status: z.array(z.string()) }),
+    outputSchema: z.object({ jobIds: z.array(z.string()) }),
+    handler: () => ({ jobIds: ['job_1'] }),
+  }),
+  dryRunRetry: defineAction({
+    name: 'delivery.dryRunRetry',
+    mode: 'dryRun',
+    inputSchema: z.object({ jobIds: z.array(z.string()) }),
+    handler: (input) => ({ retryable: input.jobIds }),
+  }),
+});
+
+registerActionCatalog(runner, actions);
+
+const workflow = defineWorkflow('retry-failed-jobs')
+  .step('jobs', actions.searchJobs, { status: ['FAILED'] })
+  .step('dryRun', actions.dryRunRetry, ({ fromStep }) => ({
+    jobIds: fromStep('jobs', '/jobIds'),
+  }))
+  .build();
+```
+
+The generated workflow is ordinary JSON workflow data:
+
+```json
+{
+  "workflowName": "retry-failed-jobs",
+  "steps": [
+    {
+      "id": "jobs",
+      "action": "delivery.searchJobs",
+      "input": {
+        "status": ["FAILED"]
+      }
+    },
+    {
+      "id": "dryRun",
+      "action": "delivery.dryRunRetry",
+      "input": {
+        "jobIds": {
+          "$fromStep": "jobs",
+          "path": "/jobIds"
+        }
+      }
+    }
+  ]
+}
+```
+
 ## Approval
 
 `mutate` actions require explicit mode allowance and approval hook approval. The approval hook receives an `approvalContext` with `userId`, `actionName`, `mode`, deterministic `inputHash`, and optional `resourceIds`, `dryRunHash`, `expiresAt`, `workflowId`, and `stepId`.

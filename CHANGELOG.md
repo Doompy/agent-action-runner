@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.4.0] - 2026-05-06
+
+### Added
+
+- Added type-safe workflow authoring helpers to `@agent-action-runner/core`: `defineAction()`, `defineActionCatalog()`, `registerActionCatalog()`, and `defineWorkflow()`.
+- Added workflow builder tests for JSON output, runner execution, input typing, previous step references, and duplicate step ids.
+
+### Changed
+
+- Bumped all public packages to `0.4.0`.
+- Updated the basic example to use the workflow builder while still executing through the JSON workflow runner.
+
+### Notes
+
+- The workflow builder generates `WorkflowDefinition` JSON. It does not execute arbitrary TypeScript.
+
 ## [0.3.2] - 2026-05-06
 
 ### Added

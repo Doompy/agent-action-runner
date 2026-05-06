@@ -29,10 +29,10 @@ This project is focused on a safety boundary between agents and TypeScript backe
 
 ## v0.4.0
 
-- Add a type-safe workflow builder.
-- Add typed action catalog helpers.
-- Improve input/output inference for registered actions.
-- Keep the builder as JSON Workflow generation, not arbitrary TypeScript execution.
+- Added a type-safe workflow builder.
+- Added typed action catalog helpers.
+- Improved input/output inference for registered actions.
+- Kept the builder as JSON Workflow generation, not arbitrary TypeScript execution.
 
 ## v0.5.0
 

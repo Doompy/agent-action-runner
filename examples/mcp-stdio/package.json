@@ -14,10 +14,10 @@
   "dependencies": {
     "@agent-action-runner/core": "file:../../packages/core",
     "@agent-action-runner/mcp": "file:../../packages/mcp",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "vitest": "^4.0.14"
   }
 }

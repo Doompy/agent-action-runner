@@ -107,6 +107,49 @@ const result = await runner.executeWorkflow({
 });
 ```
 
+## Workflow Builder Quickstart
+
+Use the builder when you want TypeScript to check action inputs and previous step references while still producing the same JSON workflow definition.
+
+```ts
+import {
+  createRunner,
+  defineAction,
+  defineActionCatalog,
+  defineWorkflow,
+  registerActionCatalog,
+} from '@agent-action-runner/core';
+import { z } from 'zod';
+
+const runner = createRunner();
+const actions = defineActionCatalog({
+  searchJobs: defineAction({
+    name: 'delivery.searchJobs',
+    mode: 'read',
+    inputSchema: z.object({ status: z.array(z.string()) }),
+    outputSchema: z.object({ jobIds: z.array(z.string()) }),
+    handler: () => ({ jobIds: ['job_1'] }),
+  }),
+  dryRunRetry: defineAction({
+    name: 'delivery.dryRunRetry',
+    mode: 'dryRun',
+    inputSchema: z.object({ jobIds: z.array(z.string()) }),
+    handler: (input) => ({ retryable: input.jobIds }),
+  }),
+});
+
+registerActionCatalog(runner, actions);
+
+const workflow = defineWorkflow('retry-failed-jobs')
+  .step('jobs', actions.searchJobs, { status: ['FAILED'] })
+  .step('dryRun', actions.dryRunRetry, ({ fromStep }) => ({
+    jobIds: fromStep('jobs', '/jobIds'),
+  }))
+  .build();
+```
+
+The builder does not execute TypeScript. It only creates a `WorkflowDefinition` for the existing JSON workflow runner.
+
 ## NestJS Quickstart
 
 ```bash
