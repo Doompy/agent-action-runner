@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createRunner } from '@agent-action-runner/core';
 import {
   createMcpToolCatalog,
+  createMcpToolReport,
   registerMcpTools,
 } from './index.js';
 import type { McpToolRequestContext } from './index.js';
@@ -65,6 +66,78 @@ describe('@agent-action-runner/mcp', () => {
     });
 
     expect(createMcpToolCatalog(runner)).toHaveLength(0);
+  });
+
+  it('reports why actions are skipped without changing the exported catalog shape', () => {
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'system.ping',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+    runner.registerAction({
+      name: 'system.echo',
+      mode: 'read',
+      inputSchema: z.string(),
+      handler: (input) => input,
+    });
+    runner.registerAction({
+      name: 'draft.email',
+      mode: 'draft',
+      inputSchema: z.object({ subject: z.string() }),
+      handler: (input) => input,
+    });
+    runner.registerAction({
+      name: 'delivery.retry',
+      mode: 'mutate',
+      inputSchema: z.object({ jobId: z.string() }),
+      handler: () => ({ retried: true }),
+    });
+
+    expect(createMcpToolCatalog(runner, { exposeModes: ['read'] })).toEqual([]);
+    expect(createMcpToolReport(runner, { exposeModes: ['read'] })).toEqual([
+      expect.objectContaining({
+        exported: false,
+        actionName: 'system.ping',
+        skipReason: 'schemaMissing',
+      }),
+      expect.objectContaining({
+        exported: false,
+        actionName: 'system.echo',
+        skipReason: 'schemaNotSerializable',
+      }),
+      expect.objectContaining({
+        exported: false,
+        actionName: 'draft.email',
+        skipReason: 'modeNotExposed',
+      }),
+      expect.objectContaining({
+        exported: false,
+        actionName: 'delivery.retry',
+        skipReason: 'mutationNotExposed',
+      }),
+    ]);
+  });
+
+  it('creates deterministic names for sanitized tool name collisions', () => {
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'admin.searchUsers',
+      mode: 'read',
+      inputSchema: z.object({ query: z.string().optional() }),
+      handler: () => ({ users: [] }),
+    });
+    runner.registerAction({
+      name: 'admin_searchUsers',
+      mode: 'read',
+      inputSchema: z.object({ query: z.string().optional() }),
+      handler: () => ({ users: [] }),
+    });
+
+    expect(createMcpToolCatalog(runner).map((tool) => tool.name)).toEqual([
+      'admin_searchUsers',
+      'admin_searchUsers_2',
+    ]);
   });
 
   it('executes registered tools with server-derived user id', async () => {

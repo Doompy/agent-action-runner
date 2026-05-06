@@ -44,6 +44,24 @@ export type McpToolCatalogEntry = {
   readonly inputSchema: JsonSchemaObject;
 };
 
+export type McpToolSkipReason =
+  | 'modeNotExposed'
+  | 'mutationNotExposed'
+  | 'schemaMissing'
+  | 'schemaNotSerializable';
+
+export type McpToolReportEntry =
+  | (McpToolCatalogEntry & {
+    readonly exported: true;
+  })
+  | {
+    readonly exported: false;
+    readonly actionName: string;
+    readonly mode: ActionMode;
+    readonly approvalRequired: boolean;
+    readonly skipReason: McpToolSkipReason;
+  };
+
 export type JsonSchemaObject = {
   readonly type: 'object';
   readonly [key: string]: unknown;
@@ -94,20 +112,33 @@ export function createMcpToolCatalog(
   runner: AgentActionRunner,
   options: McpExporterOptions = {},
 ): readonly McpToolCatalogEntry[] {
+  return createMcpToolReport(runner, options)
+    .filter((entry): entry is McpToolCatalogEntry & { readonly exported: true } => entry.exported)
+    .map(({ exported: _exported, ...entry }) => entry);
+}
+
+export function createMcpToolReport(
+  runner: AgentActionRunner,
+  options: McpExporterOptions = {},
+): readonly McpToolReportEntry[] {
   const usedNames = new Set<string>();
-  const entries: McpToolCatalogEntry[] = [];
+  const entries: McpToolReportEntry[] = [];
 
   for (const action of runner.listActions()) {
-    if (!isActionExportable(action, options)) {
+    const skipReason = getSkipReason(action, options);
+    if (skipReason) {
+      entries.push(createSkippedReportEntry(action, skipReason));
       continue;
     }
 
     const inputSchema = action.inputSchema ? toJsonSchemaObject(action.inputSchema) : undefined;
     if (!inputSchema) {
+      entries.push(createSkippedReportEntry(action, action.inputSchema ? 'schemaNotSerializable' : 'schemaMissing'));
       continue;
     }
 
     entries.push({
+      exported: true,
       name: createUniqueToolName(action.name, usedNames),
       actionName: action.name,
       mode: action.mode,
@@ -118,6 +149,19 @@ export function createMcpToolCatalog(
   }
 
   return entries;
+}
+
+function createSkippedReportEntry(
+  action: ExecutableActionDefinition,
+  skipReason: McpToolSkipReason,
+): McpToolReportEntry {
+  return {
+    exported: false,
+    actionName: action.name,
+    mode: action.mode,
+    approvalRequired: isApprovalRequired(action),
+    skipReason,
+  };
 }
 
 async function executeMcpTool(
@@ -178,11 +222,22 @@ function isActionExportable(
   action: ExecutableActionDefinition,
   options: McpExporterOptions,
 ): boolean {
+  return !getSkipReason(action, options);
+}
+
+function getSkipReason(
+  action: ExecutableActionDefinition,
+  options: McpExporterOptions,
+): McpToolSkipReason | undefined {
   if (action.mode === 'mutate') {
-    return Boolean(options.exposeMutations) && isApprovalRequired(action);
+    return Boolean(options.exposeMutations) && isApprovalRequired(action)
+      ? undefined
+      : 'mutationNotExposed';
   }
 
-  return (options.exposeModes ?? DEFAULT_EXPOSE_MODES).includes(action.mode);
+  return (options.exposeModes ?? DEFAULT_EXPOSE_MODES).includes(action.mode)
+    ? undefined
+    : 'modeNotExposed';
 }
 
 function isApprovalRequired(action: ExecutableActionDefinition): boolean {

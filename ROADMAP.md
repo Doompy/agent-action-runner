@@ -24,8 +24,8 @@ This project is focused on a safety boundary between agents and TypeScript backe
 
 ## v0.3.2
 
-- Add MCP exporter diagnostics for skipped actions.
-- Preserve the exported catalog API while adding a report API for debugging.
+- Added MCP exporter diagnostics for skipped actions.
+- Preserved the exported catalog API while adding a report API for debugging.
 
 ## v0.4.0
 

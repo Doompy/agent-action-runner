@@ -45,3 +45,24 @@ Connect the returned MCP server to a transport using the official MCP TypeScript
 - Does not export `mutate` actions unless `exposeMutations: true` is set.
 - Does not trust approval tokens or allowed modes from tool arguments.
 - Executes tools through the core runner, so policy, approval, audit, and schema validation still apply.
+
+## Diagnostics
+
+Use `createMcpToolReport()` when an action is not visible as an MCP tool.
+
+```ts
+import { createMcpToolReport } from '@agent-action-runner/mcp';
+
+const report = createMcpToolReport(runner);
+```
+
+The report includes exported tools and skipped actions. Skipped actions include one of these reasons:
+
+```txt
+modeNotExposed
+mutationNotExposed
+schemaMissing
+schemaNotSerializable
+```
+
+`createMcpToolCatalog()` still returns only exported tools.

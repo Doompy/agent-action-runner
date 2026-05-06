@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.3.2] - 2026-05-06
+
+### Added
+
+- Added `createMcpToolReport()` to explain why actions are or are not exported as MCP tools.
+- Added MCP exporter diagnostics for skipped actions, including mode, mutation, missing schema, and non-serializable schema reasons.
+
+### Changed
+
+- Bumped `@agent-action-runner/mcp` to `0.3.2`.
+- Kept `createMcpToolCatalog()` limited to exported tools.
+
 ## [0.3.1] - 2026-05-06
 
 ### Added
