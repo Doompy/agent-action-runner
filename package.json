@@ -1,8 +1,8 @@
 {
   "name": "agent-action-runner",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
-  "description": "A safe, application-native action and workflow runner for TypeScript backends.",
+  "description": "Agent-safe action and workflow runner for TypeScript backends with schema validation, approval, audit, and MCP export support.",
   "license": "Apache-2.0",
   "author": "Doompy",
   "type": "module",
@@ -16,14 +16,21 @@
     "url": "https://github.com/Doompy/agent-action-runner/issues"
   },
   "keywords": [
-    "agent",
-    "actions",
-    "workflow",
     "typescript",
-    "nestjs",
+    "ai-agent",
+    "llm",
+    "workflow",
+    "agent-workflow",
+    "tool-calling",
+    "mcp",
     "approval",
     "audit",
-    "llm"
+    "dry-run",
+    "human-in-the-loop",
+    "zod",
+    "nestjs",
+    "express",
+    "fastify"
   ],
   "engines": {
     "node": ">=20.0.0"

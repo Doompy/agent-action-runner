@@ -2,6 +2,12 @@
 
 This project is focused on a safety boundary between agents and TypeScript backends. It should not grow into a general workflow engine before the action, policy, approval, and audit contracts are solid.
 
+## v0.2.x
+
+- `v0.2.1` added the first Express operational example.
+- `v0.2.2` added the NestJS operational example and shared admin ops example package.
+- `v0.2.3` should add the Fastify operational example using the shared admin ops package.
+
 ## v0.3.0
 
 - Add `@agent-action-runner/next`.
@@ -21,7 +27,7 @@ This project is focused on a safety boundary between agents and TypeScript backe
 
 - Add persistent audit examples.
 - Add approval token binding examples.
-- The first in-memory approval/audit example was added in v0.2.1; v0.5.0 should focus on persistence and production integration patterns.
+- The first in-memory approval/audit examples were added in v0.2.1 and v0.2.2; v0.5.0 should focus on persistence and production integration patterns.
 - Start with examples before publishing Redis or Prisma integration packages.
 
 ## v0.6.0

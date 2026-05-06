@@ -1,7 +1,7 @@
 {
   "name": "@agent-action-runner/core",
   "version": "0.2.0",
-  "description": "Framework-agnostic core for Agent Action Runner.",
+  "description": "Agent-safe action and workflow runner core for TypeScript backends with schema validation, approval, and audit.",
   "license": "Apache-2.0",
   "author": "Doompy",
   "type": "module",
@@ -27,13 +27,21 @@
     "url": "https://github.com/Doompy/agent-action-runner/issues"
   },
   "keywords": [
-    "agent",
-    "actions",
-    "workflow",
     "typescript",
+    "ai-agent",
+    "llm",
+    "workflow",
+    "agent-workflow",
+    "tool-calling",
+    "mcp",
     "approval",
     "audit",
-    "llm"
+    "dry-run",
+    "human-in-the-loop",
+    "zod",
+    "nestjs",
+    "express",
+    "fastify"
   ],
   "engines": {
     "node": ">=18.18.0"

@@ -2,21 +2,17 @@ import express from 'express';
 import type { Request } from 'express';
 import { createRunner } from '@agent-action-runner/core';
 import { createExpressAdapter } from '@agent-action-runner/express';
-import { z } from 'zod';
-import { registerAdminActions } from './actions.js';
-import { createAuditTrail, toAuditEntry } from './audit.js';
 import {
+  DisableUserApprovalRequestSchema,
+  cloneUsers,
+  createAuditTrail,
   createApprovalStore,
   createDisableUserApproval,
+  createUserStore,
+  registerAdminActions,
+  toAuditEntry,
   verifyApprovalToken,
-} from './approval.js';
-import { cloneUsers, createUserStore } from './data.js';
-
-const DisableUserApprovalRequestSchema = z.object({
-  targetUserId: z.string(),
-  reason: z.string().min(1),
-  dryRunHash: z.string(),
-});
+} from 'agent-action-runner-shared-admin-ops-example';
 
 export function createAdminOpsExampleApp() {
   const users = createUserStore();

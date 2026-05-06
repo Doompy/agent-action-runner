@@ -1,0 +1,33 @@
+{
+  "name": "agent-action-runner-nestjs-admin-ops-example",
+  "version": "0.2.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prebuild": "npm run build --workspace @agent-action-runner/core --if-present && npm run build --workspace @agent-action-runner/http --if-present && npm run build --workspace @agent-action-runner/nestjs --if-present && npm run build --workspace agent-action-runner-shared-admin-ops-example --if-present",
+    "build": "tsc -p tsconfig.build.json",
+    "pretest": "npm run build --workspace @agent-action-runner/core --if-present && npm run build --workspace @agent-action-runner/http --if-present && npm run build --workspace @agent-action-runner/nestjs --if-present && npm run build --workspace agent-action-runner-shared-admin-ops-example --if-present",
+    "test": "vitest run src",
+    "pretypecheck": "npm run build --workspace @agent-action-runner/core --if-present && npm run build --workspace @agent-action-runner/http --if-present && npm run build --workspace @agent-action-runner/nestjs --if-present && npm run build --workspace agent-action-runner-shared-admin-ops-example --if-present",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@agent-action-runner/core": "file:../../packages/core",
+    "@agent-action-runner/http": "file:../../packages/http",
+    "@agent-action-runner/nestjs": "file:../../packages/nestjs",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "agent-action-runner-shared-admin-ops-example": "file:../shared-admin-ops",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.0.0",
+    "@types/express": "^5.0.6",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4",
+    "vitest": "^4.0.14"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "name": "@agent-action-runner/http",
   "version": "0.2.0",
-  "description": "Shared HTTP adapter utilities for Agent Action Runner.",
+  "description": "Shared HTTP utilities for agent-safe action and workflow runner adapters.",
   "license": "Apache-2.0",
   "author": "Doompy",
   "type": "module",
@@ -27,14 +27,21 @@
     "url": "https://github.com/Doompy/agent-action-runner/issues"
   },
   "keywords": [
-    "agent",
-    "actions",
-    "workflow",
     "typescript",
-    "http",
+    "ai-agent",
+    "llm",
+    "workflow",
+    "agent-workflow",
+    "tool-calling",
+    "mcp",
     "approval",
     "audit",
-    "llm"
+    "dry-run",
+    "human-in-the-loop",
+    "zod",
+    "nestjs",
+    "express",
+    "fastify"
   ],
   "engines": {
     "node": ">=18.18.0"

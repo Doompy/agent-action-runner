@@ -188,15 +188,18 @@ await app.register(agentRunnerFastifyPlugin, {
 
 The HTTP adapters expose `GET /actions`, `POST /actions/:name/execute`, and `POST /workflows/execute`. Server-side resolver hooks control user identity, allowed modes, approval tokens, approval context, and metadata.
 
-## Operational Example
+## Operational Examples
 
-The [Express Admin Ops example](./examples/express-admin-ops) shows the intended safety model for operational mutations:
+The admin ops examples show the intended safety model for operational mutations:
 
 ```txt
 read -> dryRun -> approve -> mutate -> audit
 ```
 
-It demonstrates `admin.searchUsers`, `admin.dryRunDisableUser`, and `admin.disableUser` with an HMAC-bound approval token and an in-memory audit trail.
+- [Express Admin Ops](./examples/express-admin-ops) shows the HTTP adapter wiring.
+- [NestJS Admin Ops](./examples/nestjs-admin-ops) shows NestJS DI and `@AgentAction()` discovery.
+
+Both examples demonstrate `admin.searchUsers`, `admin.dryRunDisableUser`, and `admin.disableUser` with an HMAC-bound approval token and an in-memory audit trail.
 
 ## Mutate Approval Model
 

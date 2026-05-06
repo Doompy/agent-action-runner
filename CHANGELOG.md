@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.2.2] - 2026-05-06
+
+### Added
+
+- Added `examples/shared-admin-ops`, a private shared example package for admin users, approval helpers, audit helpers, and action handlers.
+- Added `examples/nestjs-admin-ops`, a NestJS operational example showing `read -> dryRun -> approve -> mutate -> audit` with `@AgentAction()` and NestJS DI.
+
+### Changed
+
+- Refactored `examples/express-admin-ops` to use the shared admin ops example package.
+- Updated the operational example docs to cover both Express and NestJS.
+
+### Notes
+
+- No public package APIs changed.
+- Public package versions remain `0.2.0`; this is an example and documentation update.
+- Fastify operational example remains planned for `v0.2.3`.
+
 ## [0.2.1] - 2026-05-06
 
 ### Added
