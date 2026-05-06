@@ -220,6 +220,13 @@ const mcpServer = createMcpExporter(runner, {
 
 The MCP exporter registers eligible actions as MCP tools. By default, only `read`, `draft`, and `dryRun` actions are exported. `mutate` actions require explicit opt-in and still go through core mode checks, approval hooks, and audit hooks.
 
+## MCP Examples
+
+- [MCP Stdio](./examples/mcp-stdio) shows a runnable stdio MCP server with simple read and dry-run actions.
+- [MCP Admin Ops](./examples/mcp-admin-ops) shows the shared admin ops actions exported as MCP tools while keeping `admin.disableUser` hidden by default.
+
+Both examples use server-side user id resolution and avoid writing normal logs to stdout because stdout is reserved for the MCP stdio transport.
+
 ## Operational Examples
 
 The admin ops examples show the intended safety model for operational mutations:

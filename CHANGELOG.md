@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.3.1] - 2026-05-06
+
+### Added
+
+- Added `examples/mcp-stdio`, a runnable MCP stdio server example.
+- Added `examples/mcp-admin-ops`, a runnable MCP stdio server example using the shared admin ops domain.
+
+### Notes
+
+- No public package APIs changed.
+- Public package versions remain `0.3.0`; this is an example and documentation update.
+- The admin ops MCP example shows that `mutate` actions are not exported by default.
+
 ## [0.3.0] - 2026-05-06
 
 ### Added

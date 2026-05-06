@@ -16,6 +16,17 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Keep mutate export disabled unless explicitly configured.
 - Move Next.js adapter to later, after demand is clearer.
 
+## v0.3.1
+
+- Added runnable MCP stdio examples.
+- Added an MCP admin ops example that reuses the shared operational domain.
+- Kept `mutate` actions hidden by default in the MCP examples.
+
+## v0.3.2
+
+- Add MCP exporter diagnostics for skipped actions.
+- Preserve the exported catalog API while adding a report API for debugging.
+
 ## v0.4.0
 
 - Add a type-safe workflow builder.
