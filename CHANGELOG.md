@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.2.3] - 2026-05-06
+
+### Added
+
+- Added `examples/fastify-admin-ops`, a Fastify operational example showing `read -> dryRun -> approve -> mutate -> audit`.
+
+### Changed
+
+- Updated the operational example docs to cover Express, NestJS, and Fastify.
+
+### Notes
+
+- No public package APIs changed.
+- Public package versions remain `0.2.0`; this is an example and documentation update.
+- This completes the initial `v0.2.x` operational example line.
+
 ## [0.2.2] - 2026-05-06
 
 ### Added

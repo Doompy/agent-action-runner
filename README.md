@@ -198,8 +198,9 @@ read -> dryRun -> approve -> mutate -> audit
 
 - [Express Admin Ops](./examples/express-admin-ops) shows the HTTP adapter wiring.
 - [NestJS Admin Ops](./examples/nestjs-admin-ops) shows NestJS DI and `@AgentAction()` discovery.
+- [Fastify Admin Ops](./examples/fastify-admin-ops) shows the Fastify plugin wiring.
 
-Both examples demonstrate `admin.searchUsers`, `admin.dryRunDisableUser`, and `admin.disableUser` with an HMAC-bound approval token and an in-memory audit trail.
+All examples demonstrate `admin.searchUsers`, `admin.dryRunDisableUser`, and `admin.disableUser` with an HMAC-bound approval token and an in-memory audit trail.
 
 ## Mutate Approval Model
 
