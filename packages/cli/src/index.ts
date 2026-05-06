@@ -10,6 +10,7 @@ import type {
   WorkflowValidationAction,
 } from '@agent-action-runner/core';
 import { validateWorkflowDefinition } from '@agent-action-runner/core';
+import { z } from 'zod';
 
 const DEFAULT_CONFIG_FILE = 'agent-runner.config.json';
 const DEFAULT_ALLOWED_MODES: readonly ActionMode[] = ['read', 'draft', 'dryRun'];
@@ -45,6 +46,8 @@ export type ActionManifestEntry = {
   readonly approvalRequired?: boolean;
   readonly inputSchema?: unknown;
   readonly outputSchema?: unknown;
+  readonly inputSchemaStatus?: SchemaStatus;
+  readonly outputSchemaStatus?: SchemaStatus;
 };
 
 type CommandContext = {
@@ -75,6 +78,8 @@ type DoctorWarning = {
   readonly code: string;
   readonly message: string;
 };
+
+type SchemaStatus = 'missing' | 'present' | 'schemaNotSerializable';
 
 const DEFAULT_CONFIG: AgentRunnerCliConfig = {
   manifest: './.agent-runner/actions.json',
@@ -111,6 +116,9 @@ export async function runCli(options: CliOptions): Promise<number> {
         return 0;
       case 'actions:inspect':
         await runActionsInspect(context, parseArgs(rest));
+        return 0;
+      case 'actions:export':
+        await runActionsExport(context, parseArgs(rest));
         return 0;
       case 'workflow:validate':
         return await runWorkflowValidate(context, parseArgs(rest));
@@ -169,7 +177,7 @@ async function runInit(context: CommandContext, args: ParsedArgs): Promise<void>
 }
 
 async function runActionsList(context: CommandContext, args: ParsedArgs): Promise<void> {
-  const manifest = await loadManifest(context, args);
+  const manifest = await loadActionManifestSource(context, args);
   if (args.flags.has('json')) {
     writeJson(context, { actions: manifest.actions });
     return;
@@ -189,7 +197,7 @@ async function runActionsInspect(context: CommandContext, args: ParsedArgs): Pro
     throw new CliError('actions:inspect requires an action name.');
   }
 
-  const manifest = await loadManifest(context, args);
+  const manifest = await loadActionManifestSource(context, args);
   const action = manifest.actions.find((candidate) => candidate.name === actionName);
   if (!action) {
     throw new CliError(`Action "${actionName}" was not found in the manifest.`);
@@ -205,10 +213,20 @@ async function runActionsInspect(context: CommandContext, args: ParsedArgs): Pro
     `Mode: ${action.mode}`,
     `Approval required: ${isApprovalRequired(action) ? 'yes' : 'no'}`,
     `Description: ${action.description ?? ''}`,
-    `Input schema: ${schemaState(action.inputSchema)}`,
-    `Output schema: ${schemaState(action.outputSchema)}`,
+    `Input schema: ${schemaStateForDisplay(action, 'input')}`,
+    `Output schema: ${schemaStateForDisplay(action, 'output')}`,
     '',
   ].join('\n'));
+}
+
+async function runActionsExport(context: CommandContext, args: ParsedArgs): Promise<void> {
+  const config = await loadConfig(context, args);
+  const runner = await loadRunner(context, args, config);
+  const manifest = await createManifestFromRunner(runner);
+  const out = resolvePath(context.cwd, args.options.out ?? config.manifest);
+
+  await writeJsonFile(out, manifest);
+  context.stdout(`Exported ${manifest.actions.length} actions to ${path.relative(context.cwd, out)}\n`);
 }
 
 async function runWorkflowValidate(context: CommandContext, args: ParsedArgs): Promise<number> {
@@ -361,7 +379,7 @@ async function createRunnerMcpPreview(
 }
 
 async function runDoctor(context: CommandContext, args: ParsedArgs): Promise<number> {
-  const manifest = await loadManifest(context, args);
+  const manifest = await loadActionManifestSource(context, args);
   const warnings = createDoctorWarnings(manifest);
 
   if (args.flags.has('json')) {
@@ -385,7 +403,7 @@ async function runDoctor(context: CommandContext, args: ParsedArgs): Promise<num
 }
 
 async function runDocsGenerate(context: CommandContext, args: ParsedArgs): Promise<void> {
-  const manifest = await loadManifest(context, args);
+  const manifest = await loadActionManifestSource(context, args);
   const out = resolvePath(context.cwd, args.options.out ?? 'docs/agent-actions.md');
   const markdown = createActionsMarkdown(manifest);
 
@@ -462,18 +480,35 @@ function createDoctorWarnings(manifest: ActionManifest): readonly DoctorWarning[
         message: 'action is missing a description.',
       });
     }
-    if (action.inputSchema === undefined) {
+    const inputStatus = getSchemaStatus(action, 'input');
+    const outputStatus = getSchemaStatus(action, 'output');
+
+    if (inputStatus === 'missing') {
       warnings.push({
         actionName: action.name,
         code: 'missingInputSchema',
         message: 'action is missing inputSchema metadata.',
       });
     }
-    if (action.outputSchema === undefined) {
+    if (inputStatus === 'schemaNotSerializable') {
+      warnings.push({
+        actionName: action.name,
+        code: 'inputSchemaNotSerializable',
+        message: 'inputSchema could not be serialized to JSON Schema.',
+      });
+    }
+    if (outputStatus === 'missing') {
       warnings.push({
         actionName: action.name,
         code: 'missingOutputSchema',
         message: 'action is missing outputSchema metadata.',
+      });
+    }
+    if (outputStatus === 'schemaNotSerializable') {
+      warnings.push({
+        actionName: action.name,
+        code: 'outputSchemaNotSerializable',
+        message: 'outputSchema could not be serialized to JSON Schema.',
       });
     }
   }
@@ -495,13 +530,26 @@ function createActionsMarkdown(manifest: ActionManifest): string {
   return [
     '# Agent Actions',
     '',
-    '| Action | Mode | Approval | Description |',
-    '|---|---|---|---|',
+    '| Action | Mode | Approval | Input | Output | Description |',
+    '|---|---|---|---|---|---|',
     ...manifest.actions.map((action) => (
-      `| \`${action.name}\` | ${action.mode} | ${isApprovalRequired(action) ? 'required' : 'not required'} | ${action.description ?? ''} |`
+      `| \`${action.name}\` | ${action.mode} | ${isApprovalRequired(action) ? 'required' : 'not required'} | ${schemaStateForDisplay(action, 'input')} | ${schemaStateForDisplay(action, 'output')} | ${action.description ?? ''} |`
     )),
     '',
   ].join('\n');
+}
+
+async function loadActionManifestSource(
+  context: CommandContext,
+  args: ParsedArgs,
+  loadedConfig?: AgentRunnerCliConfig,
+): Promise<ActionManifest> {
+  const config = loadedConfig ?? await loadConfig(context, args);
+  if (args.options.runner) {
+    return createManifestFromRunner(await loadRunner(context, args, config));
+  }
+
+  return loadManifest(context, args, config);
 }
 
 async function loadConfig(context: CommandContext, args: ParsedArgs): Promise<AgentRunnerCliConfig> {
@@ -570,7 +618,83 @@ function parseManifestAction(value: unknown): ActionManifestEntry {
     approvalRequired: typeof value.approvalRequired === 'boolean' ? value.approvalRequired : undefined,
     inputSchema: value.inputSchema,
     outputSchema: value.outputSchema,
+    inputSchemaStatus: parseSchemaStatus(value.inputSchemaStatus),
+    outputSchemaStatus: parseSchemaStatus(value.outputSchemaStatus),
   };
+}
+
+function parseSchemaStatus(value: unknown): SchemaStatus | undefined {
+  return value === 'missing' || value === 'present' || value === 'schemaNotSerializable'
+    ? value
+    : undefined;
+}
+
+async function createManifestFromRunner(runner: AgentActionRunner): Promise<ActionManifest> {
+  return {
+    version: 1,
+    actions: runner.listActions().map((action) => {
+      const inputSchema = serializeSchema(action.inputSchema);
+      const outputSchema = serializeSchema(action.outputSchema);
+
+      return {
+        name: action.name,
+        mode: action.mode,
+        description: action.description,
+        approvalRequired: action.approvalRequired,
+        inputSchema: inputSchema.schema,
+        outputSchema: outputSchema.schema,
+        inputSchemaStatus: inputSchema.status,
+        outputSchemaStatus: outputSchema.status,
+      };
+    }),
+  };
+}
+
+function serializeSchema(schema: unknown): {
+  readonly schema?: unknown;
+  readonly status: SchemaStatus;
+} {
+  if (!schema) {
+    return { status: 'missing' };
+  }
+
+  const converted = convertWithZodFunction(schema) ?? convertWithSchemaMethod(schema);
+  if (converted !== undefined) {
+    return {
+      schema: converted,
+      status: 'present',
+    };
+  }
+
+  return { status: 'schemaNotSerializable' };
+}
+
+function convertWithZodFunction(schema: unknown): unknown {
+  const converter = (z as typeof z & {
+    readonly toJSONSchema?: (schema: unknown) => unknown;
+  }).toJSONSchema;
+
+  if (typeof converter !== 'function') {
+    return undefined;
+  }
+
+  try {
+    return converter(schema);
+  } catch {
+    return undefined;
+  }
+}
+
+function convertWithSchemaMethod(schema: unknown): unknown {
+  if (!isRecord(schema) || typeof schema.toJSONSchema !== 'function') {
+    return undefined;
+  }
+
+  try {
+    return schema.toJSONSchema();
+  } catch {
+    return undefined;
+  }
 }
 
 function toValidationActions(manifest: ActionManifest): readonly WorkflowValidationAction[] {
@@ -793,8 +917,18 @@ function isApprovalRequired(action: ActionManifestEntry): boolean {
   return Boolean(action.approvalRequired || action.mode === 'mutate');
 }
 
-function schemaState(value: unknown): string {
-  return value === undefined ? 'missing' : 'present';
+function getSchemaStatus(action: ActionManifestEntry, target: 'input' | 'output'): SchemaStatus {
+  const status = target === 'input' ? action.inputSchemaStatus : action.outputSchemaStatus;
+  if (status) {
+    return status;
+  }
+
+  const schema = target === 'input' ? action.inputSchema : action.outputSchema;
+  return schema === undefined ? 'missing' : 'present';
+}
+
+function schemaStateForDisplay(action: ActionManifestEntry, target: 'input' | 'output'): string {
+  return getSchemaStatus(action, target);
 }
 
 async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
@@ -826,6 +960,7 @@ function writeHelp(context: CommandContext): void {
     '  init',
     '  actions:list',
     '  actions:inspect <actionName>',
+    '  actions:export --runner <file>',
     '  workflow:validate <file>',
     '  workflow:run <file>',
     '  mcp:preview',

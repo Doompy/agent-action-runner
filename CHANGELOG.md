@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.4.3] - 2026-05-06
+
+### Added
+
+- Added `actions:export --runner <file>` to generate an action manifest from a compiled runner module.
+- Added `--runner` support to `actions:list`, `actions:inspect`, `docs:generate`, and `doctor`.
+- Added schema serialization status fields to runner-generated manifests so non-serializable schemas can be diagnosed.
+
+### Changed
+
+- Bumped `@agent-action-runner/cli` to `0.4.3`.
+- Updated generated action docs to include input and output schema status.
+
+### Notes
+
+- Runner-based inspection still imports compiled ESM JavaScript only. Framework auto-discovery remains out of scope.
+
 ## [0.4.2] - 2026-05-06
 
 ### Added

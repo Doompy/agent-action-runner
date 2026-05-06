@@ -47,6 +47,12 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Added CLI `mcp:serve` for stdio MCP export from a compiled runner module.
 - Kept mutate blocked by default and requiring explicit local opt-in.
 
+## v0.4.3
+
+- Added runner-based action manifest export.
+- Added runner-based docs and doctor commands.
+- Reduced the need to maintain `.agent-runner/actions.json` manually.
+
 ## v0.5.0
 
 - Add persistent audit examples.

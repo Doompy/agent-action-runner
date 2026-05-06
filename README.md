@@ -162,6 +162,7 @@ npx @agent-action-runner/cli workflow:validate ./agent-workflows/example.workflo
 npx @agent-action-runner/cli workflow:run ./agent-workflows/example.workflow.json --runner ./dist/agent-runner.js
 npx @agent-action-runner/cli mcp:preview
 npx @agent-action-runner/cli mcp:serve --runner ./dist/agent-runner.js
+npx @agent-action-runner/cli actions:export --runner ./dist/agent-runner.js --out ./.agent-runner/actions.json
 npx @agent-action-runner/cli doctor
 ```
 

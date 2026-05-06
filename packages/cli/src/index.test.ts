@@ -217,6 +217,69 @@ describe('@agent-action-runner/cli runner module commands', () => {
     ]));
   });
 
+  it('lists and inspects actions from a real runner when --runner is supplied', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+
+    const list = await runTestCli(cwd, ['actions:list', '--runner', runnerPath]);
+    expect(list.exitCode).toBe(0);
+    expect(list.stdout).toContain('math.double');
+    expect(list.stdout).toContain('danger.rawMutation');
+
+    const inspect = await runTestCli(cwd, ['actions:inspect', 'math.double', '--runner', runnerPath, '--json']);
+    expect(inspect.exitCode).toBe(0);
+    expect(JSON.parse(inspect.stdout).action).toMatchObject({
+      name: 'math.double',
+      inputSchemaStatus: 'present',
+      outputSchemaStatus: 'present',
+    });
+  });
+
+  it('exports a manifest from a real runner', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+    const out = path.join(cwd, '.agent-runner', 'actions.json');
+
+    const result = await runTestCli(cwd, ['actions:export', '--runner', runnerPath, '--out', out]);
+
+    expect(result.exitCode).toBe(0);
+    const manifest = JSON.parse(await readFile(out, 'utf8'));
+    expect(manifest.actions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'math.double',
+        inputSchemaStatus: 'present',
+      }),
+      expect.objectContaining({
+        name: 'danger.rawMutation',
+        inputSchemaStatus: 'schemaNotSerializable',
+        outputSchemaStatus: 'missing',
+      }),
+    ]));
+  });
+
+  it('generates docs and doctor warnings from a real runner', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+    const out = path.join(cwd, 'docs.md');
+
+    const docs = await runTestCli(cwd, ['docs:generate', '--runner', runnerPath, '--out', out]);
+    expect(docs.exitCode).toBe(0);
+    expect(await readFile(out, 'utf8')).toContain('schemaNotSerializable');
+
+    const doctor = await runTestCli(cwd, ['doctor', '--runner', runnerPath, '--json']);
+    expect(doctor.exitCode).toBe(1);
+    expect(JSON.parse(doctor.stdout).warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        actionName: 'danger.rawMutation',
+        code: 'mutateWithoutApproval',
+      }),
+      expect.objectContaining({
+        actionName: 'danger.rawMutation',
+        code: 'inputSchemaNotSerializable',
+      }),
+    ]));
+  });
+
   it('creates an MCP server helper without binding stdio', async () => {
     const runner = createRunner();
     runner.registerAction({
@@ -293,6 +356,10 @@ const objectSchema = {
   toJSONSchema: () => ({ type: 'object', additionalProperties: true }),
 };
 
+const rawSchema = {
+  safeParse: (value) => ({ success: true, data: value }),
+};
+
 const runner = createRunner({
   approval: () => ({ approved: true, approvalId: 'approval_test' }),
 });
@@ -323,6 +390,14 @@ runner.registerAction({
   inputSchema: objectSchema,
   outputSchema: objectSchema,
   handler: (input) => ({ retried: input.jobIds.length }),
+});
+
+runner.registerAction({
+  name: 'danger.rawMutation',
+  mode: 'mutate',
+  description: 'Raw mutation without serialized schemas.',
+  inputSchema: rawSchema,
+  handler: () => ({ ok: true }),
 });
 
 ${exportStatement}
