@@ -9,6 +9,7 @@ Expose existing service logic as agent-callable actions with schema validation, 
 Experimental / pre-1.0. Public APIs may change while the action, workflow, and approval contracts settle.
 
 See [CHANGELOG.md](./CHANGELOG.md) for release notes.
+See [PUBLISHING.md](./PUBLISHING.md) for npm publish automation.
 
 This repository starts with a framework-agnostic core package and first-party framework adapters:
 
