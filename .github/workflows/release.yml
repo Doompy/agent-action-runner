@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.5.0"
+        required: true
+        type: string
+      title:
+        description: "Release title. Defaults to the tag."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create or update GitHub release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Verify tag exists
+        run: git rev-parse --verify "refs/tags/${{ inputs.tag }}"
+
+      - name: Extract release notes
+        run: node scripts/extract-changelog-section.mjs "${{ inputs.tag }}" --out release-notes.md
+
+      - name: Create or update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.title || inputs.tag }}
+          body_path: release-notes.md
+          make_latest: true

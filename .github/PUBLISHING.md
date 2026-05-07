@@ -36,6 +36,21 @@ Run the `Publish` workflow from the GitHub Actions tab.
 
 The workflow uses npm Trusted Publishing through GitHub Actions OIDC. npm requires Node.js 22.14.0 or newer and npm 11.5.1 or newer for this flow, so the workflow uses Node.js 24.
 
+## GitHub Release
+
+After a version tag is pushed and npm publish succeeds, run the `Release` workflow from the GitHub Actions tab.
+
+- `tag`: the release tag, for example `v0.5.0`
+- `title`: optional release title. If omitted, the tag is used.
+
+The workflow extracts the matching section from `CHANGELOG.md` and creates or updates the GitHub Release for that tag.
+
+You can preview the notes locally with:
+
+```bash
+npm run release:notes -- v0.5.0
+```
+
 ## npm Trusted Publisher Setup
 
 For each package, configure npm trusted publishing. The helper script prints the commands by default:
