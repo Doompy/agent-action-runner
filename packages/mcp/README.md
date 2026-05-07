@@ -18,6 +18,8 @@ npm install @agent-action-runner/core @agent-action-runner/mcp @modelcontextprot
 
 `@modelcontextprotocol/sdk` is a peer dependency. This package returns an MCP SDK `McpServer`; you choose the transport.
 
+Zod 4 is required for MCP JSON Schema serialization. Core actions can still use Zod 3 for execution validation, but actions exported as MCP tools should use Zod 4-compatible schemas.
+
 ## Quickstart
 
 ```ts

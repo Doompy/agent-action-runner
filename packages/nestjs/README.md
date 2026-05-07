@@ -71,6 +71,8 @@ export class AppModule {}
 
 Decorated provider methods are registered into the shared core runner during NestJS module initialization.
 
+Provider discovery is intended for singleton/static providers with available instances during module initialization. Request-scoped provider auto-registration is not a supported discovery path; wrap request-specific data through execution context, metadata, or your service layer instead.
+
 ## Mutate Action Example
 
 ```ts
@@ -103,6 +105,8 @@ class DeliveryAgentActions {
 ```
 
 `mutate` actions still require explicit mode allowance and approval hook approval. The NestJS adapter does not bypass core safety checks.
+
+`ctx.requireApproval()` is a defense-in-depth guard inside an already-approved mutate action. It does not prompt for approval dynamically.
 
 ## Configure Hooks
 

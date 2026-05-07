@@ -5,6 +5,7 @@ import type {
   AgentActionRunner,
   ApprovalContextOverrides,
   WorkflowDefinition,
+  WorkflowValidationIssue,
 } from '@agent-action-runner/core';
 
 export type MaybePromise<T> = T | Promise<T>;
@@ -16,6 +17,14 @@ export type AgentHttpAdapterOptions<Request = unknown> = {
   readonly getApprovalContext?: (request: Request) => MaybePromise<ApprovalContextOverrides | undefined>;
   readonly getMetadata?: (request: Request) => MaybePromise<Readonly<Record<string, unknown>> | undefined>;
   readonly allowClientExecutionOptions?: boolean;
+  readonly workflowLimits?: AgentHttpWorkflowLimits | false;
+};
+
+export type AgentHttpWorkflowLimits = {
+  readonly maxSteps?: number;
+  readonly maxStepTimeoutMs?: number;
+  readonly maxRetryAttempts?: number;
+  readonly maxRetryDelayMs?: number;
 };
 
 export type AgentHttpRequestContext = {
@@ -25,6 +34,7 @@ export type AgentHttpRequestContext = {
   readonly approvalContext?: ApprovalContextOverrides;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly allowClientExecutionOptions?: boolean;
+  readonly workflowLimits?: AgentHttpWorkflowLimits | false;
 };
 
 export type AgentHttpActionSummary = {
@@ -71,6 +81,7 @@ export type AgentHttpErrorResponse = {
   readonly error: {
     readonly code: string;
     readonly message: string;
+    readonly issues?: readonly WorkflowValidationIssue[];
   };
 };
 

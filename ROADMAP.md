@@ -79,10 +79,18 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Added API reuse documentation that clarifies agents call registered actions and do not execute generated TypeScript.
 - Kept visual builder, Next.js adapter, Redis/Prisma integrations, loop/parallel/rollback DSL, and arbitrary code execution out of scope.
 
+## v0.6.1
+
+- Redacted raw approval tokens from audit events and exposed only `approvalTokenHash`.
+- Added runtime workflow validation inside `executeWorkflow()`.
+- Added HTTP workflow caps for externally exposed workflow endpoints.
+- Clarified Zod 4 requirements for MCP/CLI JSON Schema serialization.
+
 ## v0.7.0 Candidates
 
-- Persistent audit integration packages after demand is clearer, likely starting with Prisma or a generic SQL store.
-- Approval service examples with token rotation, single-use approval consumption, and operator review metadata.
+- Prisma or generic SQL production pattern documentation before adding a package.
+- Approval single-use consumption, audit append, execution attempt tracking, and idempotency key examples.
+- Optional package extraction later: `@agent-action-runner/prisma` or `@agent-action-runner/sql-audit` after demand is clearer.
 - Workflow DSL extensions after reliability basics are validated: condition, parallel execution, and rollback hooks.
 
 ## Later

@@ -7,6 +7,7 @@ import {
   PolicyRejectedError,
   SchemaValidationError,
   WorkflowExecutionError,
+  WorkflowValidationError,
 } from '@agent-action-runner/core';
 import type {
   ActionMode,
@@ -23,8 +24,16 @@ import type {
   AgentHttpMappedError,
   AgentHttpRequestContext,
   AgentHttpSuccessResponse,
+  AgentHttpWorkflowLimits,
   AgentHttpWorkflowExecuteBody,
 } from './types.js';
+
+const DEFAULT_WORKFLOW_LIMITS: Required<AgentHttpWorkflowLimits> = {
+  maxSteps: 50,
+  maxStepTimeoutMs: 30_000,
+  maxRetryAttempts: 3,
+  maxRetryDelayMs: 5_000,
+};
 
 export async function resolveAgentHttpRequestContext<Request>(
   request: Request,
@@ -37,6 +46,7 @@ export async function resolveAgentHttpRequestContext<Request>(
     approvalContext: await options.getApprovalContext?.(request),
     metadata: await options.getMetadata?.(request),
     allowClientExecutionOptions: options.allowClientExecutionOptions,
+    workflowLimits: options.workflowLimits,
   };
 }
 
@@ -91,6 +101,7 @@ export async function executeHttpWorkflow(
     executionOptions,
     Boolean(context.allowClientExecutionOptions),
   );
+  assertWorkflowWithinLimits(workflow, context.workflowLimits);
 
   const result = await runner.executeWorkflow({
     userId: context.userId,
@@ -143,6 +154,12 @@ function mapKnownError(error: unknown): AgentHttpMappedError | undefined {
     return createError(400, 'INVALID_STEP_REFERENCE', error.message);
   }
 
+  if (error instanceof WorkflowValidationError) {
+    return createError(400, 'WORKFLOW_VALIDATION_FAILED', error.message, {
+      issues: error.issues,
+    });
+  }
+
   if (error instanceof ModeNotAllowedError) {
     return createError(403, 'MODE_NOT_ALLOWED', error.message);
   }
@@ -158,7 +175,12 @@ function mapKnownError(error: unknown): AgentHttpMappedError | undefined {
   return undefined;
 }
 
-function createError(statusCode: number, code: string, message: string): AgentHttpMappedError {
+function createError(
+  statusCode: number,
+  code: string,
+  message: string,
+  details: Pick<AgentHttpErrorResponse['error'], 'issues'> = {},
+): AgentHttpMappedError {
   return {
     statusCode,
     response: {
@@ -166,6 +188,7 @@ function createError(statusCode: number, code: string, message: string): AgentHt
       error: {
         code,
         message,
+        ...details,
       },
     },
   };
@@ -214,6 +237,10 @@ function resolveWorkflowForExecution(
   },
   allowClientExecutionOptions: boolean,
 ): WorkflowDefinition {
+  if (!Array.isArray((workflow as { readonly steps?: unknown }).steps)) {
+    return workflow;
+  }
+
   return {
     ...workflow,
     steps: workflow.steps.map((step) => resolveWorkflowStepForExecution(
@@ -221,6 +248,74 @@ function resolveWorkflowForExecution(
       executionOptions,
       allowClientExecutionOptions,
     )),
+  };
+}
+
+function assertWorkflowWithinLimits(
+  workflow: WorkflowDefinition,
+  limits: AgentHttpWorkflowLimits | false | undefined,
+): void {
+  if (limits === false) {
+    return;
+  }
+
+  const resolvedLimits = resolveWorkflowLimits(limits);
+  const steps = (workflow as { readonly steps?: unknown }).steps;
+  if (!Array.isArray(steps)) {
+    return;
+  }
+
+  if (steps.length > resolvedLimits.maxSteps) {
+    throw createHttpInputError(
+      'WORKFLOW_LIMIT_EXCEEDED',
+      `Workflow has ${steps.length} steps, which exceeds the limit of ${resolvedLimits.maxSteps}.`,
+    );
+  }
+
+  steps.forEach((step, index) => {
+    if (!isRecord(step)) {
+      return;
+    }
+
+    if (typeof step.timeoutMs === 'number' && step.timeoutMs > resolvedLimits.maxStepTimeoutMs) {
+      throw createHttpInputError(
+        'WORKFLOW_LIMIT_EXCEEDED',
+        `Workflow step ${index} timeoutMs exceeds the limit of ${resolvedLimits.maxStepTimeoutMs}.`,
+      );
+    }
+
+    if (!isRecord(step.retry)) {
+      return;
+    }
+
+    if (
+      typeof step.retry.maxAttempts === 'number'
+      && step.retry.maxAttempts > resolvedLimits.maxRetryAttempts
+    ) {
+      throw createHttpInputError(
+        'WORKFLOW_LIMIT_EXCEEDED',
+        `Workflow step ${index} retry.maxAttempts exceeds the limit of ${resolvedLimits.maxRetryAttempts}.`,
+      );
+    }
+
+    if (
+      typeof step.retry.delayMs === 'number'
+      && step.retry.delayMs > resolvedLimits.maxRetryDelayMs
+    ) {
+      throw createHttpInputError(
+        'WORKFLOW_LIMIT_EXCEEDED',
+        `Workflow step ${index} retry.delayMs exceeds the limit of ${resolvedLimits.maxRetryDelayMs}.`,
+      );
+    }
+  });
+}
+
+function resolveWorkflowLimits(limits: AgentHttpWorkflowLimits | undefined): Required<AgentHttpWorkflowLimits> {
+  return {
+    maxSteps: limits?.maxSteps ?? DEFAULT_WORKFLOW_LIMITS.maxSteps,
+    maxStepTimeoutMs: limits?.maxStepTimeoutMs ?? DEFAULT_WORKFLOW_LIMITS.maxStepTimeoutMs,
+    maxRetryAttempts: limits?.maxRetryAttempts ?? DEFAULT_WORKFLOW_LIMITS.maxRetryAttempts,
+    maxRetryDelayMs: limits?.maxRetryDelayMs ?? DEFAULT_WORKFLOW_LIMITS.maxRetryDelayMs,
   };
 }
 
@@ -236,24 +331,37 @@ function resolveWorkflowStepForExecution(
     id: step.id,
     action: step.action,
     input: step.input,
-    timeoutMs: step.timeoutMs,
-    retry: step.retry,
-    continueOnError: step.continueOnError,
+    ...(step.timeoutMs === undefined ? {} : { timeoutMs: step.timeoutMs }),
+    ...(step.retry === undefined ? {} : { retry: step.retry }),
+    ...(step.continueOnError === undefined ? {} : { continueOnError: step.continueOnError }),
   };
 
   if (allowClientExecutionOptions) {
     return {
       ...resolvedStep,
-      allowedModes: step.allowedModes,
-      approvalToken: executionOptions.approvalToken ?? step.approvalToken,
-      approvalContext: executionOptions.approvalContext ?? step.approvalContext,
+      ...(step.allowedModes === undefined ? {} : { allowedModes: step.allowedModes }),
+      ...resolveOptionalExecutionOptions({
+        approvalToken: executionOptions.approvalToken ?? step.approvalToken,
+        approvalContext: executionOptions.approvalContext ?? step.approvalContext,
+      }),
     };
   }
 
   return {
     ...resolvedStep,
-    approvalToken: executionOptions.approvalToken,
-    approvalContext: executionOptions.approvalContext,
+    ...resolveOptionalExecutionOptions(executionOptions),
+  };
+}
+
+function resolveOptionalExecutionOptions(
+  executionOptions: {
+    readonly approvalToken?: string;
+    readonly approvalContext?: ApprovalContextOverrides;
+  },
+): Pick<WorkflowStep, 'approvalToken' | 'approvalContext'> {
+  return {
+    ...(executionOptions.approvalToken === undefined ? {} : { approvalToken: executionOptions.approvalToken }),
+    ...(executionOptions.approvalContext === undefined ? {} : { approvalContext: executionOptions.approvalContext }),
   };
 }
 

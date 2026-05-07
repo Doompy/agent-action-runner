@@ -10,7 +10,8 @@ const execAsync = promisify(exec);
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCommand = 'npm';
 
-const dryRun = parseBoolean(process.env.DRY_RUN, true);
+const cliDryRun = parseDryRunFlag(process.argv.slice(2));
+const dryRun = cliDryRun ?? parseBoolean(process.env.DRY_RUN, true);
 const access = process.env.NPM_ACCESS ?? 'public';
 const distTag = process.env.NPM_TAG ?? 'latest';
 
@@ -217,4 +218,29 @@ function parseBoolean(value, fallback) {
     return false;
   }
   throw new Error(`Invalid boolean value: ${value}`);
+}
+
+function parseDryRunFlag(args) {
+  let mode;
+  for (const arg of args) {
+    if (arg === '--dry-run') {
+      if (mode === false) {
+        throw new Error('Use only one of --dry-run or --publish.');
+      }
+      mode = true;
+      continue;
+    }
+
+    if (arg === '--publish') {
+      if (mode === true) {
+        throw new Error('Use only one of --dry-run or --publish.');
+      }
+      mode = false;
+      continue;
+    }
+
+    throw new Error(`Unknown argument: ${arg}`);
+  }
+
+  return mode;
 }

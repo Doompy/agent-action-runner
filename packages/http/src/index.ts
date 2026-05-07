@@ -18,5 +18,6 @@ export type {
   AgentHttpSuccessResponse,
   AgentHttpWorkflowExecuteBody,
   AgentHttpWorkflowExecutionRequest,
+  AgentHttpWorkflowLimits,
   MaybePromise,
 } from './types.js';

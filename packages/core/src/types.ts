@@ -143,7 +143,7 @@ export type ActionExecutionEvent = {
   readonly input: unknown;
   readonly output?: unknown;
   readonly outputSummary?: string;
-  readonly approvalToken?: string;
+  readonly approvalTokenHash?: string;
   readonly approvalId?: string;
   readonly status: 'started' | 'succeeded' | 'failed';
   readonly error?: unknown;

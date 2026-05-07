@@ -77,10 +77,18 @@ type AgentHttpAdapterOptions<Request> = {
   getApprovalContext?: (request: Request) => ApprovalContextOverrides | undefined | Promise<ApprovalContextOverrides | undefined>;
   getMetadata?: (request: Request) => Readonly<Record<string, unknown>> | undefined | Promise<Readonly<Record<string, unknown>> | undefined>;
   allowClientExecutionOptions?: boolean;
+  workflowLimits?: false | {
+    maxSteps?: number;
+    maxStepTimeoutMs?: number;
+    maxRetryAttempts?: number;
+    maxRetryDelayMs?: number;
+  };
 };
 ```
 
 By default, client-supplied `allowedModes`, `approvalToken`, `approvalContext`, and `metadata` are ignored. They are passed through only when `allowClientExecutionOptions: true` is set.
+
+Workflow endpoints also apply safety caps before execution. Defaults are `maxSteps: 50`, `maxStepTimeoutMs: 30000`, `maxRetryAttempts: 3`, and `maxRetryDelayMs: 5000`. Set `workflowLimits: false` only for trusted/internal endpoints that intentionally disable these caps. Configure request payload byte limits in your host framework body parser, such as Express `express.json({ limit })` or Fastify body limit options.
 
 ## Adapter Author Example
 
@@ -127,6 +135,7 @@ router.post('/workflows/execute', async (req, res) => {
 - `executeHttpAction(runner, actionName, body, context)`
 - `executeHttpWorkflow(runner, body, context)`
 - `mapAgentRunnerError(error)`
+- `AgentHttpWorkflowLimits` type
 
 ## Response Shapes
 
@@ -160,6 +169,25 @@ Error:
 }
 ```
 
+Workflow validation errors also include `issues`:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "WORKFLOW_VALIDATION_FAILED",
+    "message": "Workflow definition failed validation.",
+    "issues": [
+      {
+        "code": "invalidRetry",
+        "message": "retry.maxAttempts must be a positive integer.",
+        "path": "/steps/0/retry/maxAttempts"
+      }
+    ]
+  }
+}
+```
+
 ## Error Mapping
 
 | Core Error | HTTP Status | Code |
@@ -168,6 +196,8 @@ Error:
 | `SchemaValidationError` | `400` | `SCHEMA_VALIDATION_FAILED` |
 | `ActionTimeoutError` | `408` | `ACTION_TIMEOUT` |
 | `InvalidStepReferenceError` | `400` | `INVALID_STEP_REFERENCE` |
+| `WorkflowValidationError` | `400` | `WORKFLOW_VALIDATION_FAILED` |
+| HTTP workflow cap exceeded | `400` | `WORKFLOW_LIMIT_EXCEEDED` |
 | `ModeNotAllowedError` | `403` | `MODE_NOT_ALLOWED` |
 | `ApprovalRequiredError` | `403` | `APPROVAL_REQUIRED` |
 | `PolicyRejectedError` | `403` | `POLICY_REJECTED` |

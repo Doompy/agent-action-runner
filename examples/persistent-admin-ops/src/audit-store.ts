@@ -16,6 +16,7 @@ export type PersistedAuditEntry = {
   readonly status: 'started' | 'succeeded' | 'failed';
   readonly input: unknown;
   readonly outputSummary?: string;
+  readonly approvalTokenHash?: string;
   readonly approvalId?: string;
   readonly error?: {
     readonly name?: string;
@@ -65,6 +66,7 @@ function toPersistedAuditEntry(event: ActionExecutionEvent): PersistedAuditEntry
     status: event.status,
     input: event.input,
     outputSummary: event.outputSummary,
+    approvalTokenHash: event.approvalTokenHash,
     approvalId: event.approvalId,
     error: event.error ? toErrorSummary(event.error) : undefined,
     createdAt: event.createdAt.toISOString(),

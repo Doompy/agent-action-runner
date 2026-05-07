@@ -88,4 +88,5 @@ export {
   PolicyRejectedError,
   SchemaValidationError,
   WorkflowExecutionError,
+  WorkflowValidationError,
 } from './errors.js';

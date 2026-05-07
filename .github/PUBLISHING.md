@@ -12,7 +12,7 @@ npm test
 npm run cli:smoke
 npm run pack:check
 npm audit --omit=dev
-DRY_RUN=true npm run publish:workspaces
+npm run publish:workspaces -- --dry-run
 ```
 
 The publish script checks npm for each package version and skips versions that already exist.
@@ -20,10 +20,8 @@ The publish script checks npm for each package version and skips versions that a
 For actual publish runs, the script attaches `npm publish` to the current terminal so npm can complete OTP or browser-based authentication. If you prefer to provide an authenticator code explicitly:
 
 ```powershell
-$env:DRY_RUN="false"
 $env:NPM_CONFIG_OTP="123456"
-npm run publish:workspaces
-Remove-Item Env:DRY_RUN
+npm run publish:workspaces -- --publish
 Remove-Item Env:NPM_CONFIG_OTP
 ```
 

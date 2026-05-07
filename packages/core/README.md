@@ -217,6 +217,8 @@ Paths are JSON Pointer strings. References can only resolve against previous ste
 
 `retry.maxAttempts` includes the first attempt. `timeoutMs` marks the attempt as failed after the configured duration; it does not cancel underlying Node.js work that has already started. Use `continueOnError: true` only when downstream steps can safely consume a failed step result.
 
+For `mutate` actions, retries should only be enabled when the underlying service is idempotent or protected by a transaction/idempotency key. A timeout can happen while the original work is still running.
+
 ## Workflow Builder
 
 The builder gives TypeScript checks for action inputs and previous step references while still producing the same JSON workflow definition.
@@ -265,6 +267,8 @@ The builder does not execute TypeScript code. It only creates a `WorkflowDefinit
 ## Workflow Validation
 
 Use `validateWorkflowDefinition()` before executing workflow JSON from files, CLI input, or generated agent plans.
+
+`executeWorkflow()` also runs this validation before any step handler starts and throws `WorkflowValidationError` when the workflow is invalid.
 
 ```ts
 import { validateWorkflowDefinition } from '@agent-action-runner/core';
@@ -339,7 +343,7 @@ const inputHash = createStableHash({
 });
 ```
 
-Inside a handler, call `ctx.requireApproval()` before performing a sensitive mutation when you want an explicit guard at the mutation point.
+Inside a handler, call `ctx.requireApproval()` before performing a sensitive mutation when you want an explicit guard at the mutation point. This is a defense-in-depth check for actions that were already approved through `mutate` mode or `approvalRequired`; it does not start an interactive approval flow by itself.
 
 ```ts
 handler: async (input, ctx) => {
@@ -370,6 +374,10 @@ The audit hook receives `started`, `succeeded`, and `failed` events.
 
 Workflow retries add `attempt` and `maxAttempts` to audit events.
 
+Audit events do not include the raw `approvalToken`. When a token is present, the event includes `approvalTokenHash` instead.
+
+`approvalTokenHash` is a redacted fingerprint for audit correlation, not a secure approval token store. Approval services should use secret-backed HMACs or sufficiently random approval tokens for verification.
+
 ```ts
 import { createAuditHook, createRunner, type AuditStore } from '@agent-action-runner/core';
 
@@ -383,6 +391,7 @@ const auditStore: AuditStore = {
       actionName: event.actionName,
       mode: event.mode,
       status: event.status,
+      approvalTokenHash: event.approvalTokenHash,
       createdAt: event.createdAt.toISOString(),
     });
   },
@@ -409,6 +418,7 @@ The core package exports typed errors for common failure paths:
 - `InvalidStepReferenceError`
 - `DuplicateWorkflowStepError`
 - `WorkflowExecutionError`
+- `WorkflowValidationError`
 
 ## Public API
 

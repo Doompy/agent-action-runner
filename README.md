@@ -12,6 +12,8 @@ Experimental / pre-1.0. Public APIs may change while the action, workflow, and a
 
 See [CHANGELOG.md](./CHANGELOG.md) for release notes.
 
+Contributor tooling in this repository expects Node.js `>=20`. Published packages target consumer runtimes on Node.js `>=18.18`.
+
 This repository starts with a framework-agnostic core package and first-party framework adapters:
 
 - Action registry
@@ -52,6 +54,10 @@ existing service method
 Your backend remains responsible for authentication, authorization, transactions, and side effects. The runner gives agents a narrow boundary for calling existing business logic safely.
 
 See [API Reuse Guide](./docs/api-reuse.md) for the recommended service wrapping pattern.
+
+Core action execution supports Zod 3 and Zod 4 schemas. MCP and CLI JSON Schema serialization are based on Zod 4; use Zod 4 for actions you want to export as MCP tools or manifest schemas.
+
+For production approval/audit persistence direction, see [Prisma Approval And Audit Pattern](./docs/prisma-approval-audit.md).
 
 ## Core Quickstart
 
@@ -130,6 +136,8 @@ const result = await runner.executeWorkflow({
   },
 });
 ```
+
+`timeoutMs` marks an attempt as failed; it does not cancel work that already started in Node.js. For `mutate` actions with retry, design the underlying service around idempotency keys, transactions, and single-use approval consumption.
 
 ## Workflow Builder Quickstart
 
@@ -354,7 +362,7 @@ read -> dryRun -> approve -> mutate -> audit
 
 The adapter examples demonstrate `admin.searchUsers`, `admin.dryRunDisableUser`, and `admin.disableUser` with an HMAC-bound approval token and an in-memory audit trail.
 
-The persistent example uses the same actions with file-backed approval/audit storage. It stores only approval token hashes, binds approvals to `userId`, `actionName`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`, and persists `started`, `succeeded`, and `failed` audit events without storing the raw approval token.
+The persistent example uses the same actions with file-backed approval/audit storage. It stores approval token hashes instead of raw tokens, binds approvals to `userId`, `actionName`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`, and persists `started`, `succeeded`, and `failed` audit events without storing the raw approval token.
 
 The delivery example also includes a CLI config, action manifest, generated-style action docs, and a JSON workflow for local workflow validation and read/dryRun smoke-runs.
 
@@ -382,6 +390,8 @@ The approval hook receives:
 ```
 
 Core does not issue or sign approval tokens. Applications should bind approval tokens to the approval context fields they care about, especially `userId`, `actionName`, `mode`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`.
+
+Audit `approvalTokenHash` values are redacted fingerprints for correlation, not secure approval token storage. Approval stores should use secret-backed HMACs or sufficiently random approval tokens.
 
 ## License
 

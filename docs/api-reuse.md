@@ -58,6 +58,8 @@ Mutations should be:
 - approval gated
 - audited
 
+Audit events expose `approvalTokenHash` only as a redacted fingerprint for correlation. Do not treat it as a secure approval token store; use a secret-backed HMAC or sufficiently random approval token in the approval service.
+
 ## Workflow Reliability
 
 Workflow steps can define local reliability controls:
@@ -78,6 +80,8 @@ Workflow steps can define local reliability controls:
 ```
 
 `timeoutMs` marks an action attempt as failed after the configured duration. It does not cancel underlying Node.js work that has already started.
+
+Avoid retrying non-idempotent mutations unless the service method is designed for it. A production mutation should usually combine an idempotency key, approval single-use consumption, the business side effect, and audit append in the same transaction boundary.
 
 Use `continueOnError: true` only when a failed step is expected and downstream steps can safely consume the failure result.
 

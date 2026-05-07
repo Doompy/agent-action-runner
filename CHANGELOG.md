@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.6.1] - 2026-05-07
+
+### Fixed
+
+- Removed raw approval tokens from core audit events and replaced them with `approvalTokenHash`.
+- This patch intentionally removes raw approval tokens from audit events. This is a safety hardening change and may require audit consumers to switch from `approvalToken` to `approvalTokenHash`.
+- Added runtime workflow validation in `executeWorkflow()` so invalid workflow shape, retry, timeout, and continue-on-error values fail before handlers run.
+- Added HTTP workflow caps for max steps, max step timeout, max retry attempts, and max retry delay.
+- Mapped workflow validation failures to `400 WORKFLOW_VALIDATION_FAILED` and HTTP cap failures to `400 WORKFLOW_LIMIT_EXCEEDED`.
+
+### Changed
+
+- Bumped all public packages to `0.6.1` and updated internal peer dependency ranges to `^0.6.1`.
+- Narrowed `@agent-action-runner/mcp` Zod peer dependency to Zod 4 because MCP JSON Schema serialization relies on Zod 4 behavior.
+- Documented that CLI/MCP JSON Schema serialization is Zod 4 based, while core execution validation can still use Zod 3 or Zod 4.
+- Clarified that `ctx.requireApproval()` is a defense-in-depth guard for already-approved `mutate` or `approvalRequired` actions.
+- Added workflow validation issues to HTTP `WORKFLOW_VALIDATION_FAILED` responses.
+
+### Notes
+
+- `timeoutMs` is still a failure boundary, not cancellation. Retried mutations should be designed around idempotency keys, transactions, and single-use approval consumption.
+- `approvalTokenHash` is an audit correlation fingerprint, not a replacement for secure approval token storage. Approval stores should use secret-backed HMACs or sufficiently random tokens.
+- Payload byte limits for HTTP endpoints remain the host framework body parser's responsibility.
+
 ## [0.6.0] - 2026-05-07
 
 ### Added

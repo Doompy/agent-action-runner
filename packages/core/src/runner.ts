@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   ActionAlreadyRegisteredError,
   ActionNotFoundError,
@@ -8,9 +8,11 @@ import {
   PolicyRejectedError,
   SchemaValidationError,
   WorkflowExecutionError,
+  WorkflowValidationError,
 } from './errors.js';
 import { createStableHash } from './hash.js';
 import { fromStep, resolveWorkflowInput } from './references.js';
+import { validateWorkflowDefinition } from './validation.js';
 import type {
   ActionDefinition,
   ActionExecutionEvent,
@@ -169,6 +171,16 @@ export class AgentActionRunner {
   }
 
   async executeWorkflow(request: WorkflowExecutionInput): Promise<WorkflowExecutionResult> {
+    const validation = validateWorkflowDefinition(request.workflow, {
+      actions: this.listActions().map((action) => ({
+        name: action.name,
+        mode: action.mode,
+      })),
+    });
+    if (!validation.valid) {
+      throw new WorkflowValidationError(validation.issues);
+    }
+
     const workflowId = request.workflowId ?? this.options.createExecutionId?.() ?? randomUUID();
     const outputByStep: Record<string, unknown> = {};
     const stepResults: WorkflowStepResult[] = [];
@@ -365,6 +377,8 @@ function createAuditEvent(input: {
   outputSummary?: string;
   status: ActionExecutionEvent['status'];
 }): ActionExecutionEvent {
+  const approvalTokenHash = createApprovalTokenHash(input.context.approvalToken);
+
   return {
     executionId: input.context.executionId,
     workflowId: input.context.workflowId,
@@ -377,10 +391,18 @@ function createAuditEvent(input: {
     input: input.input,
     output: input.output,
     outputSummary: input.outputSummary,
-    approvalToken: input.context.approvalToken,
+    ...(approvalTokenHash === undefined ? {} : { approvalTokenHash }),
     approvalId: input.approvalId,
     status: input.status,
     error: input.error,
     createdAt: new Date(),
   };
+}
+
+function createApprovalTokenHash(approvalToken: string | undefined): string | undefined {
+  if (!approvalToken) {
+    return undefined;
+  }
+
+  return createHash('sha256').update(approvalToken, 'utf8').digest('hex');
 }

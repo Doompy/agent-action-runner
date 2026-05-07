@@ -1,3 +1,5 @@
+import type { WorkflowValidationIssue } from './validation.js';
+
 export class AgentActionRunnerError extends Error {
   constructor(message: string) {
     super(message);
@@ -64,5 +66,11 @@ export class WorkflowExecutionError extends AgentActionRunnerError {
   constructor(stepId: string, actionName: string, cause: unknown) {
     super(`Workflow step "${stepId}" failed while executing action "${actionName}".`);
     this.cause = cause;
+  }
+}
+
+export class WorkflowValidationError extends AgentActionRunnerError {
+  constructor(readonly issues: readonly WorkflowValidationIssue[]) {
+    super('Workflow definition failed validation.');
   }
 }

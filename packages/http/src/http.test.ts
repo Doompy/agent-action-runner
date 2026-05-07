@@ -6,6 +6,7 @@ import {
   ModeNotAllowedError,
   SchemaValidationError,
   WorkflowExecutionError,
+  WorkflowValidationError,
   createRunner,
 } from '@agent-action-runner/core';
 import {
@@ -226,6 +227,226 @@ describe('@agent-action-runner/http', () => {
     )).rejects.toBeInstanceOf(WorkflowExecutionError);
   });
 
+  it('maps invalid workflow definitions to workflow validation failures', async () => {
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'read.one',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+
+    let mapped;
+    try {
+      await executeHttpWorkflow(
+        runner,
+        {
+          workflow: {
+            workflowName: 'invalid-workflow',
+            steps: [
+              {
+                id: 'bad',
+                action: 'missing.action',
+                input: {},
+                retry: {
+                  maxAttempts: 0,
+                },
+              },
+            ],
+          },
+        },
+        {
+          userId: 'user_1',
+        },
+      );
+      throw new Error('Expected workflow validation to fail.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(WorkflowValidationError);
+      mapped = mapAgentRunnerError(error);
+    }
+
+    expect(mapped).toMatchObject({
+      statusCode: 400,
+      response: {
+        error: {
+          code: 'WORKFLOW_VALIDATION_FAILED',
+          issues: [
+            expect.objectContaining({ code: 'unknownAction' }),
+            expect.objectContaining({ code: 'invalidRetry' }),
+          ],
+        },
+      },
+    });
+  });
+
+  it('rejects workflows that exceed configured HTTP limits', async () => {
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'read.one',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+
+    const cases = [
+      {
+        workflow: {
+          workflowName: 'too-many-steps',
+          steps: [
+            { id: 'one', action: 'read.one', input: {} },
+            { id: 'two', action: 'read.one', input: {} },
+          ],
+        },
+        workflowLimits: { maxSteps: 1 },
+      },
+      {
+        workflow: {
+          workflowName: 'too-much-timeout',
+          steps: [
+            { id: 'one', action: 'read.one', input: {}, timeoutMs: 10 },
+          ],
+        },
+        workflowLimits: { maxStepTimeoutMs: 5 },
+      },
+      {
+        workflow: {
+          workflowName: 'too-many-attempts',
+          steps: [
+            { id: 'one', action: 'read.one', input: {}, retry: { maxAttempts: 4 } },
+          ],
+        },
+        workflowLimits: { maxRetryAttempts: 3 },
+      },
+      {
+        workflow: {
+          workflowName: 'too-much-delay',
+          steps: [
+            { id: 'one', action: 'read.one', input: {}, retry: { maxAttempts: 2, delayMs: 10 } },
+          ],
+        },
+        workflowLimits: { maxRetryDelayMs: 5 },
+      },
+    ];
+
+    for (const testCase of cases) {
+      try {
+        await executeHttpWorkflow(
+          runner,
+          { workflow: testCase.workflow },
+          {
+            userId: 'user_1',
+            workflowLimits: testCase.workflowLimits,
+          },
+        );
+        throw new Error('Expected workflow limit to fail.');
+      } catch (error) {
+        expect(mapAgentRunnerError(error)).toMatchObject({
+          statusCode: 400,
+          response: {
+            error: {
+              code: 'WORKFLOW_LIMIT_EXCEEDED',
+            },
+          },
+        });
+      }
+    }
+  });
+
+  it('allows trusted callers to disable HTTP workflow caps explicitly', async () => {
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'read.one',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+
+    const response = await executeHttpWorkflow(
+      runner,
+      {
+        workflow: {
+          workflowName: 'trusted-workflow',
+          steps: [
+            {
+              id: 'one',
+              action: 'read.one',
+              input: {},
+              timeoutMs: 60_000,
+              retry: {
+                maxAttempts: 10,
+                delayMs: 10_000,
+              },
+            },
+            {
+              id: 'two',
+              action: 'read.one',
+              input: {},
+            },
+          ],
+        },
+      },
+      {
+        userId: 'user_1',
+        workflowLimits: false,
+      },
+    );
+
+    expect(response.result).toMatchObject({
+      workflowName: 'trusted-workflow',
+      steps: [
+        expect.objectContaining({ id: 'one', status: 'succeeded' }),
+        expect.objectContaining({ id: 'two', status: 'succeeded' }),
+      ],
+    });
+  });
+
+  it('keeps invalid workflow values mapped as validation failures instead of limit failures', async () => {
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'read.one',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+
+    try {
+      await executeHttpWorkflow(
+        runner,
+        {
+          workflow: {
+            workflowName: 'invalid-values',
+            steps: [
+              {
+                id: 'one',
+                action: 'read.one',
+                input: {},
+                timeoutMs: 0,
+                retry: {
+                  maxAttempts: 0,
+                },
+                continueOnError: 'yes',
+              },
+            ],
+          },
+        },
+        {
+          userId: 'user_1',
+        },
+      );
+      throw new Error('Expected workflow validation to fail.');
+    } catch (error) {
+      expect(mapAgentRunnerError(error)).toMatchObject({
+        statusCode: 400,
+        response: {
+          error: {
+            code: 'WORKFLOW_VALIDATION_FAILED',
+            issues: [
+              expect.objectContaining({ code: 'invalidTimeout' }),
+              expect.objectContaining({ code: 'invalidRetry' }),
+              expect.objectContaining({ code: 'invalidContinueOnError' }),
+            ],
+          },
+        },
+      });
+    }
+  });
+
   it('maps runner errors to HTTP responses', () => {
     expect(mapAgentRunnerError(new ActionNotFoundError('missing'))).toMatchObject({
       statusCode: 404,
@@ -249,6 +470,11 @@ describe('@agent-action-runner/http', () => {
     ))).toMatchObject({
       statusCode: 404,
       response: { error: { code: 'ACTION_NOT_FOUND' } },
+    });
+
+    expect(mapAgentRunnerError(new WorkflowValidationError([]))).toMatchObject({
+      statusCode: 400,
+      response: { error: { code: 'WORKFLOW_VALIDATION_FAILED', issues: [] } },
     });
 
     expect(mapAgentRunnerError(new Error('unknown'))).toMatchObject({

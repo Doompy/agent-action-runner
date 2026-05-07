@@ -6,6 +6,7 @@ import {
   ModeNotAllowedError,
   SchemaValidationError,
   WorkflowExecutionError,
+  WorkflowValidationError,
   createRunner,
   fromStep,
 } from './index.js';
@@ -263,9 +264,11 @@ describe('AgentActionRunner', () => {
 
   it('emits audit events for action execution', async () => {
     const events: string[] = [];
+    const fullEvents: unknown[] = [];
     const runner = createRunner({
       audit: (event) => {
         events.push(`${event.actionName}:${event.status}`);
+        fullEvents.push(event);
       },
     });
 
@@ -282,6 +285,61 @@ describe('AgentActionRunner', () => {
     });
 
     expect(events).toEqual(['math.double:started', 'math.double:succeeded']);
+    expect(Object.prototype.hasOwnProperty.call(fullEvents[0] as object, 'approvalTokenHash')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(fullEvents[1] as object, 'approvalTokenHash')).toBe(false);
+  });
+
+  it('redacts approval tokens from all audit event statuses', async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const runner = createRunner({
+      approval: ({ approvalToken }) => (
+        approvalToken === 'raw-secret-token'
+          ? { approved: true, approvalId: 'approval_1' }
+          : { approved: false }
+      ),
+      audit: (event) => {
+        events.push(event);
+      },
+    });
+
+    runner.registerAction({
+      name: 'admin.disableUser',
+      mode: 'mutate',
+      approvalRequired: true,
+      handler: (input) => {
+        if ((input as { fail?: boolean }).fail) {
+          throw new Error('mutation failed');
+        }
+
+        return { ok: true };
+      },
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'admin.disableUser',
+      input: { userId: 'target_1' },
+      allowedModes: ['mutate'],
+      approvalToken: 'raw-secret-token',
+    });
+
+    await expect(runner.executeAction({
+      userId: 'user_1',
+      action: 'admin.disableUser',
+      input: { userId: 'target_2', fail: true },
+      allowedModes: ['mutate'],
+      approvalToken: 'raw-secret-token',
+    })).rejects.toThrow('mutation failed');
+
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain('raw-secret-token');
+    expect(events.map((event) => event.status)).toEqual(['started', 'succeeded', 'started', 'failed']);
+    for (const event of events) {
+      expect(event.approvalTokenHash).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
+      expect(Object.prototype.hasOwnProperty.call(event, 'approvalToken')).toBe(false);
+    }
+    expect(events[1]).toEqual(expect.objectContaining({ approvalId: 'approval_1' }));
+    expect(events[3]).toEqual(expect.objectContaining({ error: expect.any(Error) }));
   });
 
   it('retries workflow steps until they succeed', async () => {
@@ -354,6 +412,59 @@ describe('AgentActionRunner', () => {
         ],
       },
     })).rejects.toBeInstanceOf(WorkflowExecutionError);
+  });
+
+  it('validates workflow reliability values before executing steps', async () => {
+    let calls = 0;
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'unstable.read',
+      mode: 'read',
+      handler: () => {
+        calls += 1;
+        return { ok: true };
+      },
+    });
+
+    await expect(runner.executeWorkflow({
+      userId: 'user_1',
+      workflow: {
+        workflowName: 'invalid-retry',
+        steps: [
+          {
+            id: 'read',
+            action: 'unstable.read',
+            input: {},
+            retry: {
+              maxAttempts: 0,
+            },
+          },
+        ],
+      },
+    })).rejects.toMatchObject({
+      issues: [
+        expect.objectContaining({
+          code: 'invalidRetry',
+          path: '/steps/0/retry/maxAttempts',
+        }),
+      ],
+    });
+    await expect(runner.executeWorkflow({
+      userId: 'user_1',
+      workflow: {
+        workflowName: 'invalid-timeout',
+        steps: [
+          {
+            id: 'read',
+            action: 'unstable.read',
+            input: {},
+            timeoutMs: -1,
+          },
+        ],
+      },
+    })).rejects.toBeInstanceOf(WorkflowValidationError);
+    expect(calls).toBe(0);
   });
 
   it('continues after failed steps when continueOnError is enabled', async () => {

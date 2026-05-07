@@ -8,6 +8,7 @@ export type AdminOpsAuditEntry = {
   readonly actionName: string;
   readonly mode: string;
   readonly status: string;
+  readonly approvalTokenHash?: string;
   readonly approvalId?: string;
   readonly createdAt: string;
 };
@@ -25,6 +26,7 @@ export function toAuditEntry(event: ActionExecutionEvent): AdminOpsAuditEntry {
     actionName: event.actionName,
     mode: event.mode,
     status: event.status,
+    approvalTokenHash: event.approvalTokenHash,
     approvalId: event.approvalId,
     createdAt: event.createdAt.toISOString(),
   };

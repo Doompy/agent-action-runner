@@ -18,6 +18,8 @@ npm install -D @agent-action-runner/cli @modelcontextprotocol/sdk
 
 `@modelcontextprotocol/sdk` is a peer dependency used by `mcp:serve`.
 
+Runner-based schema export uses Zod 4 JSON Schema conversion. Core can execute actions with Zod 3 or Zod 4 schemas, but CLI manifest schema serialization is Zod 4 based. If a runner exports Zod v3 schemas, CLI schema serialization may mark them as `schemaNotSerializable`.
+
 You can also run commands with:
 
 ```bash
@@ -137,7 +139,7 @@ agent-action-runner actions:list --runner ./dist/agent-runner.js
 agent-action-runner actions:inspect delivery.searchJobs --runner ./dist/agent-runner.js
 ```
 
-Serializable Zod schemas are written as JSON Schema. Non-serializable schemas are marked with `schemaNotSerializable`.
+Serializable Zod 4 schemas are written as JSON Schema. Non-serializable schemas are marked with `schemaNotSerializable`.
 
 ## Workflow Validation
 
