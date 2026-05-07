@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.4.5] - 2026-05-07
+
+### Changed
+
+- Bumped `@agent-action-runner/cli` to `0.4.5` after the npm registry rejected reuse of `0.4.4`.
+
+### Notes
+
+- No runtime API changes.
+
 ## [0.4.4] - 2026-05-06
 
 ### Added
