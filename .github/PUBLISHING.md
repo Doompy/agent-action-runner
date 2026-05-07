@@ -52,6 +52,8 @@ APPLY=true npm run trust:workspaces
 
 The trust script does not pre-check existing trusted publishers by default because `npm trust list` also requires 2FA. It runs `npm trust github ...` directly so npm can use its normal browser or OTP authentication flow.
 
+If npm returns `409 Conflict` for a package, the script treats it as already configured and continues to the next package.
+
 To enable a pre-check in an already authenticated shell:
 
 ```bash

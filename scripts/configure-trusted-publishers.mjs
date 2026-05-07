@@ -54,7 +54,16 @@ for (const pkg of packages) {
   }
 
   console.log(`configure trusted publisher for ${pkg.name}`);
-  await runNpm(args);
+  try {
+    await runNpm(args);
+  } catch (error) {
+    if (isTrustConflict(error)) {
+      console.log(`skip ${pkg.name}: trusted publisher already configured`);
+      continue;
+    }
+
+    throw error;
+  }
 }
 
 async function discoverPublishablePackages() {
@@ -116,7 +125,18 @@ async function runNpm(args) {
       cwd: rootDir,
       env: process.env,
       shell: process.platform === 'win32',
-      stdio: 'inherit',
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+    const stdout = [];
+    const stderr = [];
+
+    child.stdout.on('data', (chunk) => {
+      stdout.push(chunk);
+      process.stdout.write(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr.push(chunk);
+      process.stderr.write(chunk);
     });
 
     child.on('error', reject);
@@ -126,9 +146,17 @@ async function runNpm(args) {
         return;
       }
 
-      reject(new Error(`npm ${args.join(' ')} failed with ${signal ?? `exit code ${code}`}`));
+      const error = new Error(`npm ${args.join(' ')} failed with ${signal ?? `exit code ${code}`}`);
+      error.stdout = Buffer.concat(stdout).toString('utf8');
+      error.stderr = Buffer.concat(stderr).toString('utf8');
+      reject(error);
     });
   });
+}
+
+function isTrustConflict(error) {
+  const output = `${error?.stdout ?? ''}\n${error?.stderr ?? ''}`;
+  return output.includes('E409') || output.includes('409 Conflict');
 }
 
 async function trustedPublisherExists(packageName) {
