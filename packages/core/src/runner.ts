@@ -10,6 +10,7 @@ import {
   WorkflowExecutionError,
   WorkflowValidationError,
 } from './errors.js';
+import { transformAuditPayload } from './audit-policy.js';
 import { createStableHash } from './hash.js';
 import { fromStep, resolveWorkflowInput } from './references.js';
 import { validateWorkflowDefinition } from './validation.js';
@@ -99,10 +100,12 @@ export class AgentActionRunner {
 
     await this.options.audit?.(createAuditEvent({
       action,
+      auditDefaults: this.options.auditDefaults,
       attempt: request.attempt,
       context,
       input,
       maxAttempts: request.maxAttempts,
+      summarizeOutput: this.options.summarizeOutput,
       status: 'started',
     }));
 
@@ -139,12 +142,13 @@ export class AgentActionRunner {
       await this.options.audit?.(createAuditEvent({
         action,
         approvalId,
+        auditDefaults: this.options.auditDefaults,
         attempt: request.attempt,
         context,
         input,
         maxAttempts: request.maxAttempts,
         output,
-        outputSummary: this.options.summarizeOutput?.(output),
+        summarizeOutput: this.options.summarizeOutput,
         status: 'succeeded',
       }));
 
@@ -159,11 +163,13 @@ export class AgentActionRunner {
       await this.options.audit?.(createAuditEvent({
         action,
         approvalId,
+        auditDefaults: this.options.auditDefaults,
         attempt: request.attempt,
         context,
         error,
         input,
         maxAttempts: request.maxAttempts,
+        summarizeOutput: this.options.summarizeOutput,
         status: 'failed',
       }));
       throw error;
@@ -368,16 +374,25 @@ function createApprovalContext(input: {
 function createAuditEvent(input: {
   action: ExecutableActionDefinition;
   approvalId?: string;
+  auditDefaults?: AgentRunnerOptions['auditDefaults'];
   attempt?: number;
   context: AgentExecutionContext;
   error?: unknown;
   input: unknown;
   maxAttempts?: number;
   output?: unknown;
-  outputSummary?: string;
+  summarizeOutput?: AgentRunnerOptions['summarizeOutput'];
   status: ActionExecutionEvent['status'];
 }): ActionExecutionEvent {
   const approvalTokenHash = createApprovalTokenHash(input.context.approvalToken);
+  const transformedPayload = transformAuditPayload({
+    action: input.action,
+    auditDefaults: input.auditDefaults,
+    ...(Object.prototype.hasOwnProperty.call(input, 'error') ? { error: input.error } : {}),
+    input: input.input,
+    ...(Object.prototype.hasOwnProperty.call(input, 'output') ? { output: input.output } : {}),
+    summarizeOutput: input.summarizeOutput,
+  });
 
   return {
     executionId: input.context.executionId,
@@ -388,13 +403,15 @@ function createAuditEvent(input: {
     mode: input.action.mode,
     attempt: input.attempt,
     maxAttempts: input.maxAttempts,
-    input: input.input,
-    output: input.output,
-    outputSummary: input.outputSummary,
+    input: transformedPayload.input,
+    ...(transformedPayload.output === undefined ? {} : { output: transformedPayload.output }),
+    ...(transformedPayload.outputSummary === undefined
+      ? {}
+      : { outputSummary: transformedPayload.outputSummary }),
     ...(approvalTokenHash === undefined ? {} : { approvalTokenHash }),
     approvalId: input.approvalId,
     status: input.status,
-    error: input.error,
+    ...(transformedPayload.error === undefined ? {} : { error: transformedPayload.error }),
     createdAt: new Date(),
   };
 }

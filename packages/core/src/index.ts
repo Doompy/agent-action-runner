@@ -32,6 +32,8 @@ export type {
   ActionHandler,
   ActionMode,
   ActionRiskLevel,
+  AuditPayloadMode,
+  AuditPayloadPolicy,
   AgentExecutionContext,
   AgentRunnerOptions,
   ApprovalCheck,

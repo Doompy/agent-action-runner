@@ -342,6 +342,241 @@ describe('AgentActionRunner', () => {
     expect(events[3]).toEqual(expect.objectContaining({ error: expect.any(Error) }));
   });
 
+  it('keeps audit input, output, and error payloads full by default', async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const expectedError = new Error('full failure');
+    const runner = createRunner({
+      audit: (event) => {
+        events.push(event as unknown as Record<string, unknown>);
+      },
+    });
+
+    runner.registerAction({
+      name: 'audit.success',
+      mode: 'read',
+      handler: (input) => ({
+        ok: true,
+        input,
+      }),
+    });
+    runner.registerAction({
+      name: 'audit.failure',
+      mode: 'read',
+      handler: () => {
+        throw expectedError;
+      },
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'audit.success',
+      input: {
+        email: 'user@example.com',
+      },
+    });
+    await expect(runner.executeAction({
+      userId: 'user_1',
+      action: 'audit.failure',
+      input: {
+        reason: 'keep full input',
+      },
+    })).rejects.toBe(expectedError);
+
+    expect(events[0].input).toEqual({ email: 'user@example.com' });
+    expect(events[1].output).toEqual({
+      ok: true,
+      input: {
+        email: 'user@example.com',
+      },
+    });
+    expect(events[2].input).toEqual({ reason: 'keep full input' });
+    expect(events[3].error).toBe(expectedError);
+  });
+
+  it('applies runner audit defaults for hash input, summary output, and summary error', async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const runner = createRunner({
+      auditDefaults: {
+        input: 'hash',
+        output: 'summary',
+        error: 'summary',
+        redactPaths: ['/password', '/items/0/token'],
+      },
+      audit: (event) => {
+        events.push(event as unknown as Record<string, unknown>);
+      },
+      summarizeOutput: () => 'custom output summary',
+    });
+
+    runner.registerAction({
+      name: 'audit.safeSuccess',
+      mode: 'read',
+      handler: () => ({
+        email: 'user@example.com',
+        token: 'output-token',
+      }),
+    });
+    runner.registerAction({
+      name: 'audit.safeFailure',
+      mode: 'read',
+      handler: () => {
+        throw Object.assign(new Error('database password leaked'), {
+          detail: {
+            password: 'error-secret',
+          },
+        });
+      },
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'audit.safeSuccess',
+      input: {
+        password: 'input-secret',
+        items: [
+          {
+            token: 'array-token',
+          },
+        ],
+      },
+    });
+    await expect(runner.executeAction({
+      userId: 'user_1',
+      action: 'audit.safeFailure',
+      input: {
+        password: 'input-secret',
+      },
+    })).rejects.toThrow('database password leaked');
+
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain('input-secret');
+    expect(serialized).not.toContain('array-token');
+    expect(serialized).not.toContain('output-token');
+    expect(serialized).not.toContain('error-secret');
+    expect(events[0].input).toEqual({
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(Object.prototype.hasOwnProperty.call(events[1], 'output')).toBe(false);
+    expect(events[1].outputSummary).toBe('custom output summary');
+    expect(events[3].error).toEqual({
+      name: 'Error',
+      message: 'database password leaked',
+    });
+  });
+
+  it('lets action audit policies override defaults and merge redact paths', async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const runner = createRunner({
+      auditDefaults: {
+        input: 'hash',
+        output: 'full',
+        error: 'summary',
+        redactPaths: ['/globalSecret'],
+      },
+      audit: (event) => {
+        events.push(event as unknown as Record<string, unknown>);
+      },
+    });
+
+    runner.registerAction({
+      name: 'audit.override',
+      mode: 'read',
+      auditPolicy: {
+        input: 'full',
+        output: 'hash',
+        error: 'omit',
+        redactPaths: ['/localSecret', '/items/0/token'],
+      },
+      handler: () => ({
+        outputSecret: 'do not store',
+      }),
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'audit.override',
+      input: {
+        globalSecret: 'global',
+        localSecret: 'local',
+        visible: 'kept',
+        items: [
+          {
+            token: 'array-token',
+          },
+        ],
+      },
+    });
+
+    expect(events[0].input).toEqual({
+      globalSecret: '[REDACTED]',
+      localSecret: '[REDACTED]',
+      visible: 'kept',
+      items: [
+        {
+          token: '[REDACTED]',
+        },
+      ],
+    });
+    expect(events[1].output).toEqual({
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(JSON.stringify(events)).not.toContain('do not store');
+  });
+
+  it('omits audit payload fields when configured', async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const runner = createRunner({
+      auditDefaults: {
+        input: 'omit',
+        output: 'omit',
+        error: 'omit',
+      },
+      audit: (event) => {
+        events.push(event as unknown as Record<string, unknown>);
+      },
+    });
+
+    runner.registerAction({
+      name: 'audit.omitSuccess',
+      mode: 'read',
+      handler: () => ({
+        secret: 'output-secret',
+      }),
+    });
+    runner.registerAction({
+      name: 'audit.omitFailure',
+      mode: 'read',
+      handler: () => {
+        throw new Error('secret error');
+      },
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'audit.omitSuccess',
+      input: {
+        secret: 'input-secret',
+      },
+    });
+    await expect(runner.executeAction({
+      userId: 'user_1',
+      action: 'audit.omitFailure',
+      input: {
+        secret: 'failure-input',
+      },
+    })).rejects.toThrow('secret error');
+
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain('input-secret');
+    expect(serialized).not.toContain('output-secret');
+    expect(serialized).not.toContain('failure-input');
+    expect(serialized).not.toContain('secret error');
+    expect(serialized).not.toContain('"input"');
+    expect(serialized).not.toContain('"output"');
+    expect(serialized).not.toContain('"outputSummary"');
+    expect(serialized).not.toContain('"error"');
+  });
+
   it('retries workflow steps until they succeed', async () => {
     let attempts = 0;
     const runner = createRunner({

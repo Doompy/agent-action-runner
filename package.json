@@ -1,6 +1,6 @@
 {
   "name": "agent-action-runner",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "Agent-safe action and workflow runner for TypeScript backends with schema validation, approval, audit, and MCP export support.",
   "license": "Apache-2.0",

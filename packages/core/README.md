@@ -24,6 +24,7 @@ npm install @agent-action-runner/core zod
 - Action modes: `read`, `draft`, `dryRun`, `mutate`.
 - Server-controlled mode enforcement.
 - Policy, approval, and audit hooks.
+- Audit payload minimization for input, output, and error data.
 - Deterministic input hashing for approval checks.
 - Public stable hash helper for approval services.
 - Audit store helper for persistent audit adapters.
@@ -378,6 +379,64 @@ Audit events do not include the raw `approvalToken`. When a token is present, th
 
 `approvalTokenHash` is a redacted fingerprint for audit correlation, not a secure approval token store. Approval services should use secret-backed HMACs or sufficiently random approval tokens for verification.
 
+By default, audit payload behavior remains compatible with previous releases:
+
+```ts
+const runner = createRunner({
+  auditDefaults: {
+    input: 'full',
+    output: 'full',
+    error: 'full',
+  },
+});
+```
+
+For production systems, minimize stored payloads:
+
+```ts
+const runner = createRunner({
+  auditDefaults: {
+    input: 'hash',
+    output: 'summary',
+    error: 'summary',
+    redactPaths: ['/password', '/token', '/secret'],
+  },
+  audit: createAuditHook(auditStore),
+});
+```
+
+Actions can override runner defaults with `auditPolicy`:
+
+```ts
+runner.registerAction({
+  name: 'admin.disableUser',
+  mode: 'mutate',
+  approvalRequired: true,
+  auditPolicy: {
+    input: 'hash',
+    output: 'summary',
+    error: 'summary',
+    redactPaths: ['/reason', '/profile/email'],
+  },
+  handler: async (input, ctx) => {
+    ctx.requireApproval();
+    return adminService.disableUser(input.userId, input.reason);
+  },
+});
+```
+
+`redactPaths` uses exact JSON Pointer paths, such as `/password`, `/profile/email`, or `/items/0/token`. Missing paths are ignored. Wildcards, globs, and regex paths are not supported in `v0.6.2`.
+
+Payload modes:
+
+| Field | Modes |
+|---|---|
+| `input` | `full`, `redacted`, `hash`, `omit` |
+| `output` | `full`, `redacted`, `summary`, `hash`, `omit` |
+| `error` | `full`, `redacted`, `summary`, `omit` |
+
+`hash` stores `{ hash }` after redaction using `createStableHash()`. `output: 'summary'` stores only `outputSummary`. `error: 'summary'` stores `{ name, message }` and omits stack/cause fields.
+
 ```ts
 import { createAuditHook, createRunner, type AuditStore } from '@agent-action-runner/core';
 
@@ -434,7 +493,7 @@ Common exports:
 - `validateWorkflowDefinition`
 - `createStableHash`
 - `createAuditHook`
-- core types such as `ActionDefinition`, `ActionExample`, `ActionRiskLevel`, `WorkflowDefinition`, `ActionMode`, `AgentExecutionContext`, `ApprovalContext`, `AuditStore`
+- core types such as `ActionDefinition`, `ActionExample`, `ActionRiskLevel`, `AuditPayloadPolicy`, `AuditPayloadMode`, `WorkflowDefinition`, `ActionMode`, `AgentExecutionContext`, `ApprovalContext`, `AuditStore`
 
 ## Examples
 

@@ -12,6 +12,15 @@ export type ActionExample = {
 
 export type JsonPointer = `/${string}` | '';
 
+export type AuditPayloadMode = 'full' | 'redacted' | 'hash' | 'summary' | 'omit';
+
+export type AuditPayloadPolicy = {
+  readonly input?: Extract<AuditPayloadMode, 'full' | 'redacted' | 'hash' | 'omit'>;
+  readonly output?: AuditPayloadMode;
+  readonly error?: Extract<AuditPayloadMode, 'full' | 'redacted' | 'summary' | 'omit'>;
+  readonly redactPaths?: readonly JsonPointer[];
+};
+
 export type StepReference = {
   readonly $fromStep: string;
   readonly path: JsonPointer;
@@ -79,6 +88,7 @@ export type ActionDefinition<Input = unknown, Output = unknown> = {
   readonly riskLevel?: ActionRiskLevel;
   readonly deprecated?: boolean | string;
   readonly examples?: readonly ActionExample[];
+  readonly auditPolicy?: AuditPayloadPolicy;
   readonly inputSchema?: z.ZodType<Input>;
   readonly outputSchema?: z.ZodType<Output>;
   readonly approvalRequired?: boolean;
@@ -161,6 +171,7 @@ export type AgentRunnerOptions = {
   readonly policy?: PolicyCheck;
   readonly approval?: ApprovalCheck;
   readonly audit?: AuditHook;
+  readonly auditDefaults?: AuditPayloadPolicy;
   readonly createExecutionId?: () => string;
   readonly summarizeOutput?: (output: unknown) => string | undefined;
 };

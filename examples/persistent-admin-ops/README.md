@@ -98,6 +98,7 @@ curl -s http://localhost:3003/audit
 - Approval records store only `tokenHash`, not the raw token.
 - Approval verification checks `userId`, `actionName`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`.
 - Audit events are appended to JSONL and omit the raw approval token.
+- The runner uses production-style audit defaults: hashed input, summarized output, summarized error, and common redaction paths.
 
 ## License
 

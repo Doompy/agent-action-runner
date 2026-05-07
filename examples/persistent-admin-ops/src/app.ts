@@ -25,6 +25,12 @@ export function createPersistentAdminOpsExampleApp(
   const approvalStore = new FileApprovalStore(join(dataDir, 'approvals.json'));
 
   const runner = createRunner({
+    auditDefaults: {
+      input: 'hash',
+      output: 'summary',
+      error: 'summary',
+      redactPaths: ['/password', '/token', '/secret'],
+    },
     approval: ({ approvalToken, approvalContext }) => approvalStore.verifyApprovalToken({
       token: approvalToken,
       approvalContext,

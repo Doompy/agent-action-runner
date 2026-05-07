@@ -104,6 +104,12 @@ export function registerAdminActions(
     resourceType: 'adminUser',
     riskLevel: 'high',
     approvalRequired: true,
+    auditPolicy: {
+      input: 'hash',
+      output: 'summary',
+      error: 'summary',
+      redactPaths: ['/reason'],
+    },
     inputSchema: DisableUserInputSchema,
     outputSchema: DisableUserOutputSchema,
     handler: (input, context) => disableAdminUser(users, input, context),

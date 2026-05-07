@@ -86,12 +86,29 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Added HTTP workflow caps for externally exposed workflow endpoints.
 - Clarified Zod 4 requirements for MCP/CLI JSON Schema serialization.
 
+## v0.6.2
+
+- Added audit data minimization controls for action input, output, and error payloads.
+- Added runner-level `auditDefaults` and action-level `auditPolicy`.
+- Added exact JSON Pointer `redactPaths` support.
+- Added security, MCP security, NestJS production, audit redaction, and release checklist docs.
+- Kept persistence packages, idempotency, OpenTelemetry, and policy helpers out of scope.
+
 ## v0.7.0 Candidates
 
-- Prisma or generic SQL production pattern documentation before adding a package.
+- First-class `idempotencyKey` propagation through action execution context.
 - Approval single-use consumption, audit append, execution attempt tracking, and idempotency key examples.
+- Prisma or generic SQL production pattern documentation before adding a package.
+- Consider a NestJS + Prisma operational example before extracting a persistence package.
 - Optional package extraction later: `@agent-action-runner/prisma` or `@agent-action-runner/sql-audit` after demand is clearer.
 - Workflow DSL extensions after reliability basics are validated: condition, parallel execution, and rollback hooks.
+
+## v0.8.0 Candidates
+
+- OpenTelemetry integration, likely as a separate package and runner wrapper.
+- Small policy composition helpers.
+- Testing utilities for action execution, approval, audit, redaction, and idempotency assertions.
+- OpenAPI export and workflow explain/graph tooling if schema serialization remains stable.
 
 ## Later
 

@@ -60,6 +60,21 @@ Mutations should be:
 
 Audit events expose `approvalTokenHash` only as a redacted fingerprint for correlation. Do not treat it as a secure approval token store; use a secret-backed HMAC or sufficiently random approval token in the approval service.
 
+For production, configure audit minimization before adding durable audit storage:
+
+```ts
+createRunner({
+  auditDefaults: {
+    input: 'hash',
+    output: 'summary',
+    error: 'summary',
+    redactPaths: ['/password', '/token', '/secret'],
+  },
+});
+```
+
+Use action-level `auditPolicy` for high-risk actions that need stricter handling than the runner default.
+
 ## Workflow Reliability
 
 Workflow steps can define local reliability controls:

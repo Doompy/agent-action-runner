@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.6.2] - 2026-05-07
+
+### Added
+
+- Added audit data minimization controls to `@agent-action-runner/core`.
+- Added runner-level `auditDefaults` and action-level `auditPolicy`.
+- Added `AuditPayloadMode` and `AuditPayloadPolicy` public types.
+- Added exact JSON Pointer `redactPaths` support for audit `input`, `output`, and `error` payloads.
+- Added audit redaction, security model, MCP security, NestJS production, and release checklist docs.
+
+### Changed
+
+- Bumped all public packages to `0.6.2` and updated internal peer dependency ranges to `^0.6.2`.
+- Updated the persistent admin ops example to use production-style audit defaults.
+- Updated the shared admin mutate action with an action-level audit policy example.
+
+### Notes
+
+- Patch compatibility is preserved: when no audit policy is configured, audit `input`, `output`, and `error` payloads keep their previous full behavior.
+- Production systems should prefer minimized audit payloads, for example `input: 'hash'`, `output: 'summary'`, `error: 'summary'`, plus domain-specific `redactPaths`.
+- `redactPaths` supports exact JSON Pointer paths only in this release. Wildcards, globs, and regex paths remain out of scope.
+
 ## [0.6.1] - 2026-05-07
 
 ### Fixed

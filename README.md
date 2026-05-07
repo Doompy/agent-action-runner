@@ -21,6 +21,7 @@ This repository starts with a framework-agnostic core package and first-party fr
 - Zod input and output validation
 - Action mode enforcement
 - Policy, approval, and audit hooks
+- Audit payload minimization for input, output, and error data
 - Restricted step output references
 - Action metadata for API reuse documentation and MCP descriptions
 - Workflow retry, timeout, and continue-on-error controls
@@ -58,6 +59,8 @@ See [API Reuse Guide](./docs/api-reuse.md) for the recommended service wrapping 
 Core action execution supports Zod 3 and Zod 4 schemas. MCP and CLI JSON Schema serialization are based on Zod 4; use Zod 4 for actions you want to export as MCP tools or manifest schemas.
 
 For production approval/audit persistence direction, see [Prisma Approval And Audit Pattern](./docs/prisma-approval-audit.md).
+
+For audit minimization and security guidance, see [Audit Redaction](./docs/audit-redaction.md) and [Security Model](./docs/security.md).
 
 ## Core Quickstart
 
@@ -138,6 +141,56 @@ const result = await runner.executeWorkflow({
 ```
 
 `timeoutMs` marks an attempt as failed; it does not cancel work that already started in Node.js. For `mutate` actions with retry, design the underlying service around idempotency keys, transactions, and single-use approval consumption.
+
+## Audit Data Minimization
+
+By default, `v0.6.2` preserves the existing audit payload behavior for patch compatibility:
+
+```ts
+createRunner({
+  auditDefaults: {
+    input: 'full',
+    output: 'full',
+    error: 'full',
+  },
+});
+```
+
+For production systems, configure audit defaults to store less data:
+
+```ts
+const runner = createRunner({
+  auditDefaults: {
+    input: 'hash',
+    output: 'summary',
+    error: 'summary',
+    redactPaths: ['/password', '/token', '/secret'],
+  },
+  audit: createAuditHook(auditStore),
+});
+```
+
+Individual actions can override the runner defaults:
+
+```ts
+runner.registerAction({
+  name: 'admin.disableUser',
+  mode: 'mutate',
+  approvalRequired: true,
+  auditPolicy: {
+    input: 'hash',
+    output: 'summary',
+    error: 'summary',
+    redactPaths: ['/reason', '/email'],
+  },
+  handler: async (input, ctx) => {
+    ctx.requireApproval();
+    return adminService.disableUser(input.userId, input.reason);
+  },
+});
+```
+
+`redactPaths` uses exact JSON Pointer paths only. Wildcards, globs, and regex paths are intentionally out of scope for now.
 
 ## Workflow Builder Quickstart
 
