@@ -59,6 +59,11 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Added CLI smoke checks to CI.
 - Polished CLI output flags and local loop docs.
 
+## v0.4.6
+
+- Expanded package-level README documentation for npm package pages.
+- Kept the release docs-only with no runtime API changes.
+
 ## v0.5.0
 
 - Add persistent audit examples.

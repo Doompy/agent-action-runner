@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/express",
-  "version": "0.4.0",
+  "version": "0.4.6",
   "description": "Express adapter for agent-safe action and workflow runner for TypeScript backends.",
   "license": "Apache-2.0",
   "author": "Doompy",

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.4.6] - 2026-05-07
+
+### Changed
+
+- Expanded package-level README documentation for npm users across core, HTTP adapters, NestJS, MCP, and CLI packages.
+- Bumped all public packages to `0.4.6` for a docs-only package README refresh.
+
+### Notes
+
+- No runtime API changes.
+
 ## [0.4.5] - 2026-05-07
 
 ### Changed

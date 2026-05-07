@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/mcp",
-  "version": "0.4.0",
+  "version": "0.4.6",
   "description": "MCP exporter for Agent Action Runner.",
   "license": "Apache-2.0",
   "author": "Doompy",
