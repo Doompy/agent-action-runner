@@ -1,9 +1,12 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
+const execFileAsync = promisify(execFile);
+const execAsync = promisify(exec);
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCommand = 'npm';
 
@@ -40,6 +43,11 @@ for (const pkg of packages) {
 
   if (!apply) {
     console.log(`would run: npm ${args.map(formatShellArg).join(' ')}`);
+    continue;
+  }
+
+  if (await trustedPublisherExists(pkg.name)) {
+    console.log(`skip ${pkg.name}: trusted publisher already configured`);
     continue;
   }
 
@@ -119,6 +127,47 @@ async function runNpm(args) {
       reject(new Error(`npm ${args.join(' ')} failed with ${signal ?? `exit code ${code}`}`));
     });
   });
+}
+
+async function trustedPublisherExists(packageName) {
+  const result = await runNpmCaptured(['trust', 'list', packageName, '--json']);
+  const output = result.stdout.trim();
+
+  if (output === '') {
+    return false;
+  }
+
+  const parsed = JSON.parse(output);
+  const configs = Array.isArray(parsed) ? parsed : [parsed];
+
+  return configs.some((config) => (
+    config
+    && config.type === 'github'
+    && config.file === workflowFile
+    && config.repository === repository
+  ));
+}
+
+async function runNpmCaptured(args) {
+  return process.platform === 'win32'
+    ? execAsync([npmCommand, ...args.map(quoteShellArg)].join(' '), {
+      cwd: rootDir,
+      env: process.env,
+      maxBuffer: 1024 * 1024 * 16,
+    })
+    : execFileAsync(npmCommand, args, {
+      cwd: rootDir,
+      env: process.env,
+      maxBuffer: 1024 * 1024 * 16,
+    });
+}
+
+function quoteShellArg(value) {
+  if (/^[A-Za-z0-9@%_+=:,./-]+$/.test(value)) {
+    return value;
+  }
+
+  return `"${value.replace(/"/g, '\\"')}"`;
 }
 
 function formatShellArg(value) {
