@@ -1,6 +1,6 @@
 # Publishing
 
-Publishing is automated through a manually triggered GitHub Actions workflow.
+Publishing and GitHub Release creation are automated from version tags.
 
 ## Local Dry Run
 
@@ -27,23 +27,40 @@ Remove-Item Env:DRY_RUN
 Remove-Item Env:NPM_CONFIG_OTP
 ```
 
-## GitHub Actions
+## Tag-Based Publish
 
-Run the `Publish` workflow from the GitHub Actions tab.
+After the release commit is on `main`, create and push an annotated version tag:
+
+```bash
+git tag -a v0.6.0 -m "v0.6.0"
+git push origin v0.6.0
+```
+
+Pushing a `v*` tag automatically starts:
+
+- `CI`
+- `Publish`
+- `Release`
+
+The `Publish` workflow uses npm Trusted Publishing through GitHub Actions OIDC. npm requires Node.js 22.14.0 or newer and npm 11.5.1 or newer for this flow, so the workflow uses Node.js 24.
+
+## Manual Publish Check
+
+You can still run the `Publish` workflow manually from the GitHub Actions tab.
 
 - `dry_run: true` checks what would be published.
 - `dry_run: false` publishes missing package versions.
 
-The workflow uses npm Trusted Publishing through GitHub Actions OIDC. npm requires Node.js 22.14.0 or newer and npm 11.5.1 or newer for this flow, so the workflow uses Node.js 24.
+Manual publish is mainly for dry-runs, retries, or recovery if the tag-triggered workflow needs to be rerun.
 
 ## GitHub Release
 
-After a version tag is pushed and npm publish succeeds, run the `Release` workflow from the GitHub Actions tab.
+The `Release` workflow also runs automatically for `v*` tags. It extracts the matching section from `CHANGELOG.md` and creates or updates the GitHub Release for that tag.
+
+You can still run it manually from the GitHub Actions tab:
 
 - `tag`: the release tag, for example `v0.5.0`
 - `title`: optional release title. If omitted, the tag is used.
-
-The workflow extracts the matching section from `CHANGELOG.md` and creates or updates the GitHub Release for that tag.
 
 You can preview the notes locally with:
 

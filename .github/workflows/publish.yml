@@ -1,6 +1,9 @@
 name: Publish
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -52,4 +55,4 @@ jobs:
       - name: Publish workspaces
         run: npm run publish:workspaces
         env:
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}

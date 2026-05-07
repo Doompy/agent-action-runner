@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -19,6 +22,9 @@ jobs:
   release:
     name: Create or update GitHub release
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      RELEASE_TITLE: ${{ github.event_name == 'workflow_dispatch' && (inputs.title || inputs.tag) || github.ref_name }}
 
     steps:
       - name: Checkout
@@ -33,15 +39,15 @@ jobs:
           package-manager-cache: false
 
       - name: Verify tag exists
-        run: git rev-parse --verify "refs/tags/${{ inputs.tag }}"
+        run: git rev-parse --verify "refs/tags/${RELEASE_TAG}"
 
       - name: Extract release notes
-        run: node scripts/extract-changelog-section.mjs "${{ inputs.tag }}" --out release-notes.md
+        run: node scripts/extract-changelog-section.mjs "${RELEASE_TAG}" --out release-notes.md
 
       - name: Create or update GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
-          name: ${{ inputs.title || inputs.tag }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TITLE }}
           body_path: release-notes.md
           make_latest: true
