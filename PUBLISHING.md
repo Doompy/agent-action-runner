@@ -17,6 +17,16 @@ DRY_RUN=true npm run publish:workspaces
 
 The publish script checks npm for each package version and skips versions that already exist.
 
+For actual publish runs, the script attaches `npm publish` to the current terminal so npm can complete OTP or browser-based authentication. If you prefer to provide an authenticator code explicitly:
+
+```powershell
+$env:DRY_RUN="false"
+$env:NPM_CONFIG_OTP="123456"
+npm run publish:workspaces
+Remove-Item Env:DRY_RUN
+Remove-Item Env:NPM_CONFIG_OTP
+```
+
 ## GitHub Actions
 
 Run the `Publish` workflow from the GitHub Actions tab.
@@ -38,6 +48,14 @@ After the packages exist on npm and you are logged in with npm 11.10.0 or newer,
 
 ```bash
 APPLY=true npm run trust:workspaces
+```
+
+On PowerShell:
+
+```powershell
+$env:APPLY="true"
+npm run trust:workspaces
+Remove-Item Env:APPLY
 ```
 
 The script configures each public package with:

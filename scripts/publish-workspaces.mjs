@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { exec, execFile } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -154,6 +154,10 @@ async function npmVersionExists(spec) {
 }
 
 async function runNpm(args, options = {}) {
+  if (!options.silent) {
+    return runNpmInteractive(args);
+  }
+
   try {
     const result = process.platform === 'win32'
       ? await execAsync([npmCommand, ...args.map(quoteShellArg)].join(' '), {
@@ -167,27 +171,31 @@ async function runNpm(args, options = {}) {
         maxBuffer: 1024 * 1024 * 16,
       });
 
-    if (!options.silent) {
-      if (result.stdout) {
-        process.stdout.write(result.stdout);
-      }
-      if (result.stderr) {
-        process.stderr.write(result.stderr);
-      }
-    }
-
     return result;
   } catch (error) {
-    if (!options.silent) {
-      if (error.stdout) {
-        process.stdout.write(error.stdout);
-      }
-      if (error.stderr) {
-        process.stderr.write(error.stderr);
-      }
-    }
     throw error;
   }
+}
+
+function runNpmInteractive(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(npmCommand, args, {
+      cwd: rootDir,
+      env: process.env,
+      shell: process.platform === 'win32',
+      stdio: 'inherit',
+    });
+
+    child.on('error', reject);
+    child.on('exit', (code, signal) => {
+      if (code === 0) {
+        resolve({ stdout: '', stderr: '' });
+        return;
+      }
+
+      reject(new Error(`npm ${args.join(' ')} failed with ${signal ?? `exit code ${code}`}`));
+    });
+  });
 }
 
 function quoteShellArg(value) {

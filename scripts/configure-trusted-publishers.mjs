@@ -1,12 +1,9 @@
 #!/usr/bin/env node
-import { exec, execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 
-const execFileAsync = promisify(execFile);
-const execAsync = promisify(exec);
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCommand = 'npm';
 
@@ -104,32 +101,24 @@ function inferGitHubRepository(repositoryUrl) {
 }
 
 async function runNpm(args) {
-  const result = process.platform === 'win32'
-    ? await execAsync([npmCommand, ...args.map(quoteShellArg)].join(' '), {
+  return new Promise((resolve, reject) => {
+    const child = spawn(npmCommand, args, {
       cwd: rootDir,
       env: process.env,
-      maxBuffer: 1024 * 1024 * 16,
-    })
-    : await execFileAsync(npmCommand, args, {
-      cwd: rootDir,
-      env: process.env,
-      maxBuffer: 1024 * 1024 * 16,
+      shell: process.platform === 'win32',
+      stdio: 'inherit',
     });
 
-  if (result.stdout) {
-    process.stdout.write(result.stdout);
-  }
-  if (result.stderr) {
-    process.stderr.write(result.stderr);
-  }
-}
+    child.on('error', reject);
+    child.on('exit', (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
 
-function quoteShellArg(value) {
-  if (/^[A-Za-z0-9@%_+=:,./-]+$/.test(value)) {
-    return value;
-  }
-
-  return `"${value.replace(/"/g, '\\"')}"`;
+      reject(new Error(`npm ${args.join(' ')} failed with ${signal ?? `exit code ${code}`}`));
+    });
+  });
 }
 
 function formatShellArg(value) {
