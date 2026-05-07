@@ -11,6 +11,7 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const npmCommand = 'npm';
 
 const apply = parseBoolean(process.env.APPLY, false);
+const precheck = parseBoolean(process.env.NPM_TRUST_PRECHECK, false);
 const workflowFile = process.env.NPM_TRUST_WORKFLOW ?? 'publish.yml';
 const repository = process.env.NPM_TRUST_REPOSITORY ?? inferGitHubRepository(await readRootRepositoryUrl());
 const packages = await discoverPublishablePackages();
@@ -27,6 +28,7 @@ if (packages.length === 0) {
 console.log(`Trusted publisher mode: ${apply ? 'apply' : 'dry run'}`);
 console.log(`Repository: ${repository}`);
 console.log(`Workflow file: ${workflowFile}`);
+console.log(`Precheck existing trust: ${precheck ? 'yes' : 'no'}`);
 console.log(`Packages: ${packages.map((pkg) => pkg.name).join(', ')}`);
 
 for (const pkg of packages) {
@@ -46,7 +48,7 @@ for (const pkg of packages) {
     continue;
   }
 
-  if (await trustedPublisherExists(pkg.name)) {
+  if (precheck && await trustedPublisherExists(pkg.name)) {
     console.log(`skip ${pkg.name}: trusted publisher already configured`);
     continue;
   }

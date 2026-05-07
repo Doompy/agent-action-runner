@@ -50,6 +50,14 @@ After the packages exist on npm and you are logged in with npm 11.10.0 or newer,
 APPLY=true npm run trust:workspaces
 ```
 
+The trust script does not pre-check existing trusted publishers by default because `npm trust list` also requires 2FA. It runs `npm trust github ...` directly so npm can use its normal browser or OTP authentication flow.
+
+To enable a pre-check in an already authenticated shell:
+
+```bash
+APPLY=true NPM_TRUST_PRECHECK=true npm run trust:workspaces
+```
+
 On PowerShell:
 
 ```powershell
