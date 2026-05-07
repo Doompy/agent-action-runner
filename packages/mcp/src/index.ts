@@ -9,14 +9,16 @@ import type {
 import type { AnySchema } from '@modelcontextprotocol/sdk/server/zod-compat.js';
 import { z } from 'zod';
 import type {
+  ActionExample,
   ActionMode,
+  ActionRiskLevel,
   AgentActionRunner,
   ApprovalContextOverrides,
   ExecutableActionDefinition,
 } from '@agent-action-runner/core';
 
 const DEFAULT_SERVER_NAME = 'agent-action-runner';
-const DEFAULT_SERVER_VERSION = '0.3.0';
+const DEFAULT_SERVER_VERSION = '0.6.0';
 const DEFAULT_EXPOSE_MODES: readonly ActionMode[] = ['read', 'draft', 'dryRun'];
 
 export type MaybePromise<T> = T | Promise<T>;
@@ -41,6 +43,11 @@ export type McpToolCatalogEntry = {
   readonly mode: ActionMode;
   readonly description: string;
   readonly approvalRequired: boolean;
+  readonly tags?: readonly string[];
+  readonly resourceType?: string;
+  readonly riskLevel?: ActionRiskLevel;
+  readonly deprecated?: boolean | string;
+  readonly examples?: readonly ActionExample[];
   readonly inputSchema: JsonSchemaObject;
 };
 
@@ -59,6 +66,11 @@ export type McpToolReportEntry =
     readonly actionName: string;
     readonly mode: ActionMode;
     readonly approvalRequired: boolean;
+    readonly tags?: readonly string[];
+    readonly resourceType?: string;
+    readonly riskLevel?: ActionRiskLevel;
+    readonly deprecated?: boolean | string;
+    readonly examples?: readonly ActionExample[];
     readonly skipReason: McpToolSkipReason;
   };
 
@@ -101,6 +113,9 @@ export function registerMcpTools(
         'agent-action-runner/actionName': action.name,
         'agent-action-runner/mode': action.mode,
         'agent-action-runner/approvalRequired': tool.approvalRequired,
+        'agent-action-runner/riskLevel': action.riskLevel,
+        'agent-action-runner/resourceType': action.resourceType,
+        'agent-action-runner/tags': action.tags,
       },
     }, async (args: unknown, extra: McpToolRequestContext) => executeMcpTool(runner, action, args, extra, options));
   }
@@ -144,6 +159,7 @@ export function createMcpToolReport(
       mode: action.mode,
       description: createToolDescription(action),
       approvalRequired: isApprovalRequired(action),
+      ...createActionMetadata(action),
       inputSchema,
     });
   }
@@ -160,6 +176,7 @@ function createSkippedReportEntry(
     actionName: action.name,
     mode: action.mode,
     approvalRequired: isApprovalRequired(action),
+    ...createActionMetadata(action),
     skipReason,
   };
 }
@@ -282,7 +299,29 @@ function createToolDescription(action: ExecutableActionDefinition): string {
     `Agent Action Runner action: ${action.name}`,
     `Mode: ${action.mode}`,
     `Approval required: ${isApprovalRequired(action) ? 'yes' : 'no'}`,
+    action.riskLevel ? `Risk level: ${action.riskLevel}` : undefined,
+    action.resourceType ? `Resource type: ${action.resourceType}` : undefined,
+    action.tags && action.tags.length > 0 ? `Tags: ${action.tags.join(', ')}` : undefined,
+    action.deprecated
+      ? `Deprecated: ${typeof action.deprecated === 'string' ? action.deprecated : 'yes'}`
+      : undefined,
   ].filter(Boolean).join('\n\n');
+}
+
+function createActionMetadata(action: ExecutableActionDefinition): {
+  readonly tags?: readonly string[];
+  readonly resourceType?: string;
+  readonly riskLevel?: ActionRiskLevel;
+  readonly deprecated?: boolean | string;
+  readonly examples?: readonly ActionExample[];
+} {
+  return {
+    tags: action.tags,
+    resourceType: action.resourceType,
+    riskLevel: action.riskLevel,
+    deprecated: action.deprecated,
+    examples: action.examples,
+  };
 }
 
 function createToolAnnotations(action: ExecutableActionDefinition): ToolAnnotations {

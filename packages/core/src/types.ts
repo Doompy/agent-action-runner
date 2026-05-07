@@ -2,6 +2,14 @@ import type { z } from 'zod';
 
 export type ActionMode = 'read' | 'draft' | 'dryRun' | 'mutate';
 
+export type ActionRiskLevel = 'low' | 'medium' | 'high';
+
+export type ActionExample = {
+  readonly title: string;
+  readonly input: unknown;
+  readonly description?: string;
+};
+
 export type JsonPointer = `/${string}` | '';
 
 export type StepReference = {
@@ -25,6 +33,14 @@ export type WorkflowStep = {
   readonly allowedModes?: readonly ActionMode[];
   readonly approvalToken?: string;
   readonly approvalContext?: ApprovalContextOverrides;
+  readonly timeoutMs?: number;
+  readonly retry?: WorkflowStepRetry;
+  readonly continueOnError?: boolean;
+};
+
+export type WorkflowStepRetry = {
+  readonly maxAttempts: number;
+  readonly delayMs?: number;
 };
 
 export type WorkflowDefinition = {
@@ -58,6 +74,11 @@ export type ActionDefinition<Input = unknown, Output = unknown> = {
   readonly name: string;
   readonly mode: ActionMode;
   readonly description?: string;
+  readonly tags?: readonly string[];
+  readonly resourceType?: string;
+  readonly riskLevel?: ActionRiskLevel;
+  readonly deprecated?: boolean | string;
+  readonly examples?: readonly ActionExample[];
   readonly inputSchema?: z.ZodType<Input>;
   readonly outputSchema?: z.ZodType<Output>;
   readonly approvalRequired?: boolean;
@@ -117,6 +138,8 @@ export type ActionExecutionEvent = {
   readonly userId: string;
   readonly actionName: string;
   readonly mode: ActionMode;
+  readonly attempt?: number;
+  readonly maxAttempts?: number;
   readonly input: unknown;
   readonly output?: unknown;
   readonly outputSummary?: string;
@@ -146,6 +169,10 @@ export type ActionExecutionInput = {
   readonly userId: string;
   readonly action: string;
   readonly input: unknown;
+  readonly executionId?: string;
+  readonly attempt?: number;
+  readonly maxAttempts?: number;
+  readonly timeoutMs?: number;
   readonly allowedModes?: readonly ActionMode[];
   readonly approvalToken?: string;
   readonly approvalContext?: ApprovalContextOverrides;
@@ -170,13 +197,34 @@ export type WorkflowExecutionInput = {
   readonly metadata?: Readonly<Record<string, unknown>>;
 };
 
-export type WorkflowStepResult = {
+export type WorkflowStepError = {
+  readonly name: string;
+  readonly message: string;
+};
+
+export type WorkflowStepSucceededResult = {
   readonly id: string;
   readonly actionName: string;
   readonly mode: ActionMode;
   readonly executionId: string;
+  readonly status: 'succeeded';
+  readonly attempts: number;
   readonly output: unknown;
 };
+
+export type WorkflowStepFailedResult = {
+  readonly id: string;
+  readonly actionName: string;
+  readonly mode?: ActionMode;
+  readonly executionId: string;
+  readonly status: 'failed';
+  readonly attempts: number;
+  readonly error: WorkflowStepError;
+  readonly continued: true;
+  readonly output?: unknown;
+};
+
+export type WorkflowStepResult = WorkflowStepSucceededResult | WorkflowStepFailedResult;
 
 export type WorkflowExecutionResult = {
   readonly workflowId: string;

@@ -1,5 +1,6 @@
 import {
   ActionNotFoundError,
+  ActionTimeoutError,
   ApprovalRequiredError,
   InvalidStepReferenceError,
   ModeNotAllowedError,
@@ -47,6 +48,11 @@ export function createActionListResponse(runner: AgentActionRunner): AgentHttpAc
       mode: action.mode,
       description: action.description,
       approvalRequired: Boolean(action.approvalRequired || action.mode === 'mutate'),
+      ...(action.tags === undefined ? {} : { tags: action.tags }),
+      ...(action.resourceType === undefined ? {} : { resourceType: action.resourceType }),
+      ...(action.riskLevel === undefined ? {} : { riskLevel: action.riskLevel }),
+      ...(action.deprecated === undefined ? {} : { deprecated: action.deprecated }),
+      ...(action.examples === undefined ? {} : { examples: action.examples }),
     })),
   };
 }
@@ -127,6 +133,10 @@ function mapKnownError(error: unknown): AgentHttpMappedError | undefined {
 
   if (error instanceof SchemaValidationError) {
     return createError(400, 'SCHEMA_VALIDATION_FAILED', error.message);
+  }
+
+  if (error instanceof ActionTimeoutError) {
+    return createError(408, 'ACTION_TIMEOUT', error.message);
   }
 
   if (error instanceof InvalidStepReferenceError) {
@@ -226,6 +236,9 @@ function resolveWorkflowStepForExecution(
     id: step.id,
     action: step.action,
     input: step.input,
+    timeoutMs: step.timeoutMs,
+    retry: step.retry,
+    continueOnError: step.continueOnError,
   };
 
   if (allowClientExecutionOptions) {

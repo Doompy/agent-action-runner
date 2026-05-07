@@ -72,14 +72,22 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Added core helpers for stable input hashing and audit store wiring.
 - Kept Redis, Prisma, and production approval service packages out of scope until the example pattern is validated.
 
-## v0.6.0 Candidates
+## v0.6.0
+
+- Added action metadata for API reuse documentation, CLI output, HTTP action summaries, and MCP tool descriptions.
+- Added workflow reliability controls: timeout, fixed retry, and continue-on-error.
+- Added API reuse documentation that clarifies agents call registered actions and do not execute generated TypeScript.
+- Kept visual builder, Next.js adapter, Redis/Prisma integrations, loop/parallel/rollback DSL, and arbitrary code execution out of scope.
+
+## v0.7.0 Candidates
 
 - Persistent audit integration packages after demand is clearer, likely starting with Prisma or a generic SQL store.
 - Approval service examples with token rotation, single-use approval consumption, and operator review metadata.
-- Workflow DSL extensions: condition, retry, timeout, and parallel execution.
+- Workflow DSL extensions after reliability basics are validated: condition, parallel execution, and rollback hooks.
 
 ## Later
 
 - Next.js adapter, after demand is clearer.
-- Read-only TypeScript analyzer experiments.
-- Sandboxed TypeScript runner only after the safety model is mature.
+- Read-only TypeScript analyzer experiments, if they help generate action docs without executing code.
+- No arbitrary TypeScript runner unless the safety model changes substantially.
+- Visual builder only after action metadata, workflow execution, and operational examples prove demand.

@@ -17,6 +17,15 @@ describe('@agent-action-runner/mcp', () => {
       name: 'math.double',
       mode: 'read',
       description: 'Double a number.',
+      tags: ['math'],
+      resourceType: 'number',
+      riskLevel: 'low',
+      examples: [
+        {
+          title: 'Double 21',
+          input: { value: 21 },
+        },
+      ],
       inputSchema: z.object({ value: z.number() }),
       handler: (input) => ({ value: input.value * 2 }),
     });
@@ -33,6 +42,15 @@ describe('@agent-action-runner/mcp', () => {
         actionName: 'math.double',
         mode: 'read',
         approvalRequired: false,
+        tags: ['math'],
+        resourceType: 'number',
+        riskLevel: 'low',
+        examples: [
+          {
+            title: 'Double 21',
+            input: { value: 21 },
+          },
+        ],
       }),
     ]);
   });
@@ -157,8 +175,11 @@ describe('@agent-action-runner/mcp', () => {
     });
 
     const result = await callRegisteredTool(server, 'math_double', { value: 21 });
+    const tool = getRegisteredTool(server, 'math_double');
 
     expect(result.isError).toBe(false);
+    expect(tool.description).toContain('Mode: read');
+    expect(tool.description).toContain('Approval required: no');
     expect(result.structuredContent).toMatchObject({
       actionName: 'math.double',
       mode: 'read',
@@ -254,8 +275,20 @@ async function callRegisteredTool(
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<CallToolResult> {
+  const tool = getRegisteredTool(server, toolName);
+  return tool.handler(args, createToolContext());
+}
+
+function getRegisteredTool(
+  server: McpServer,
+  toolName: string,
+): {
+  readonly description?: string;
+  readonly handler: (args: Record<string, unknown>, extra: McpToolRequestContext) => Promise<CallToolResult>;
+} {
   const tools = (server as unknown as {
     readonly _registeredTools: Record<string, {
+      readonly description?: string;
       readonly handler: (args: Record<string, unknown>, extra: McpToolRequestContext) => Promise<CallToolResult>;
     }>;
   })._registeredTools;
@@ -264,7 +297,7 @@ async function callRegisteredTool(
     throw new Error(`Tool "${toolName}" was not registered.`);
   }
 
-  return tool.handler(args, createToolContext());
+  return tool;
 }
 
 function createToolContext(): McpToolRequestContext {

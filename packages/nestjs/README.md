@@ -4,6 +4,8 @@ NestJS adapter for Agent Action Runner.
 
 Use this package when your existing business logic already lives in NestJS services and you want to expose selected methods as agent-callable actions through the shared core runner.
 
+The adapter registers selected provider methods as actions. It does not execute agent-generated code or auto-expose arbitrary providers.
+
 Experimental / pre-1.0. Public APIs may change while the action, workflow, and approval contracts settle.
 
 ## Install
@@ -41,6 +43,9 @@ class DeliveryAgentActions {
     name: 'delivery.searchJobs',
     mode: 'read',
     description: 'Search delivery jobs by status.',
+    tags: ['delivery', 'operations'],
+    resourceType: 'deliveryJob',
+    riskLevel: 'low',
     inputSchema: SearchJobsInput,
     outputSchema: z.object({
       jobIds: z.array(z.string()),
@@ -79,6 +84,9 @@ class DeliveryAgentActions {
     name: 'delivery.executeRetry',
     mode: 'mutate',
     description: 'Retry approved delivery jobs.',
+    tags: ['delivery', 'retry'],
+    resourceType: 'deliveryJob',
+    riskLevel: 'high',
     approvalRequired: true,
     inputSchema: z.object({
       jobIds: z.array(z.string()),

@@ -7,6 +7,9 @@ Generated-style action documentation for the delivery ops example.
 ### `delivery.searchJobs`
 
 - Mode: `read`
+- Risk: `low`
+- Resource: `deliveryJob`
+- Tags: `delivery`, `operations`
 - Approval required: no
 - Description: Search delivery jobs by status, campaign, and retryability.
 
@@ -15,6 +18,9 @@ Use this action for broad filtered reads. It returns matching jobs and a compact
 ### `delivery.dryRunRetry`
 
 - Mode: `dryRun`
+- Risk: `medium`
+- Resource: `deliveryJob`
+- Tags: `delivery`, `retry`, `approval`
 - Approval required: no
 - Description: Preview retry eligibility and impact for delivery jobs.
 
@@ -23,6 +29,9 @@ Use this action before any retry mutation. It returns `retryableJobIds`, `blocke
 ### `delivery.executeRetry`
 
 - Mode: `mutate`
+- Risk: `high`
+- Resource: `deliveryJob`
+- Tags: `delivery`, `retry`
 - Approval required: yes
 - Description: Queue approved retryable delivery jobs for retry.
 

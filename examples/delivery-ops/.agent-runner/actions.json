@@ -5,6 +5,18 @@
       "name": "delivery.searchJobs",
       "mode": "read",
       "description": "Search delivery jobs by status, campaign, and retryability.",
+      "tags": ["delivery", "operations"],
+      "resourceType": "deliveryJob",
+      "riskLevel": "low",
+      "examples": [
+        {
+          "title": "Search failed spring campaign jobs",
+          "input": {
+            "status": ["FAILED", "DLQ"],
+            "campaignId": "campaign_spring"
+          }
+        }
+      ],
       "approvalRequired": false,
       "inputSchema": {
         "type": "object",
@@ -43,6 +55,9 @@
       "name": "delivery.dryRunRetry",
       "mode": "dryRun",
       "description": "Preview retry eligibility and impact for delivery jobs.",
+      "tags": ["delivery", "retry", "approval"],
+      "resourceType": "deliveryJob",
+      "riskLevel": "medium",
       "approvalRequired": false,
       "inputSchema": {
         "type": "object",
@@ -93,6 +108,9 @@
       "name": "delivery.executeRetry",
       "mode": "mutate",
       "description": "Queue approved retryable delivery jobs for retry.",
+      "tags": ["delivery", "retry"],
+      "resourceType": "deliveryJob",
+      "riskLevel": "high",
       "approvalRequired": true,
       "inputSchema": {
         "type": "object",

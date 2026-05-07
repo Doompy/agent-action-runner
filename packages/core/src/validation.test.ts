@@ -112,4 +112,54 @@ describe('validateWorkflowDefinition', () => {
       'invalidInputValue',
     ]);
   });
+
+  it('accepts retry, timeout, and continueOnError step controls', () => {
+    const result = validateWorkflowDefinition({
+      workflowName: 'reliable-workflow',
+      steps: [
+        {
+          id: 'jobs',
+          action: 'delivery.searchJobs',
+          input: {},
+          timeoutMs: 1000,
+          retry: {
+            maxAttempts: 3,
+            delayMs: 10,
+          },
+          continueOnError: false,
+        },
+      ],
+    }, { actions });
+
+    expect(result).toEqual({
+      valid: true,
+      issues: [],
+    });
+  });
+
+  it('reports invalid retry, timeout, and continueOnError values', () => {
+    const result = validateWorkflowDefinition({
+      workflowName: 'bad-controls',
+      steps: [
+        {
+          id: 'jobs',
+          action: 'delivery.searchJobs',
+          input: {},
+          timeoutMs: 0,
+          retry: {
+            maxAttempts: 0,
+            delayMs: -1,
+          },
+          continueOnError: 'yes',
+        },
+      ],
+    }, { actions });
+
+    expect(result.issues.map((issue) => issue.code)).toEqual([
+      'invalidTimeout',
+      'invalidRetry',
+      'invalidRetry',
+      'invalidContinueOnError',
+    ]);
+  });
 });

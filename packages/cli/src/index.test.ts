@@ -260,6 +260,9 @@ describe('@agent-action-runner/cli runner module commands', () => {
     expect(inspect.exitCode).toBe(0);
     expect(JSON.parse(inspect.stdout).action).toMatchObject({
       name: 'math.double',
+      tags: ['math'],
+      resourceType: 'number',
+      riskLevel: 'low',
       inputSchemaStatus: 'present',
       outputSchemaStatus: 'present',
     });
@@ -277,6 +280,9 @@ describe('@agent-action-runner/cli runner module commands', () => {
     expect(manifest.actions).toEqual(expect.arrayContaining([
       expect.objectContaining({
         name: 'math.double',
+        tags: ['math'],
+        resourceType: 'number',
+        riskLevel: 'low',
         inputSchemaStatus: 'present',
       }),
       expect.objectContaining({
@@ -398,6 +404,15 @@ runner.registerAction({
   name: 'math.double',
   mode: 'read',
   description: 'Double a number.',
+  tags: ['math'],
+  resourceType: 'number',
+  riskLevel: 'low',
+  examples: [
+    {
+      title: 'Double a value',
+      input: { value: 2 },
+    },
+  ],
   inputSchema: objectSchema,
   outputSchema: objectSchema,
   handler: (input) => ({ value: input.value * 2 }),
@@ -407,6 +422,9 @@ runner.registerAction({
   name: 'delivery.searchJobs',
   mode: 'read',
   description: 'Search delivery jobs.',
+  tags: ['delivery'],
+  resourceType: 'deliveryJob',
+  riskLevel: 'low',
   inputSchema: objectSchema,
   outputSchema: objectSchema,
   handler: () => ({ jobIds: ['job_1'] }),
@@ -416,6 +434,9 @@ runner.registerAction({
   name: 'delivery.executeRetry',
   mode: 'mutate',
   description: 'Retry approved jobs.',
+  tags: ['delivery', 'retry'],
+  resourceType: 'deliveryJob',
+  riskLevel: 'high',
   approvalRequired: true,
   inputSchema: objectSchema,
   outputSchema: objectSchema,
@@ -426,6 +447,7 @@ runner.registerAction({
   name: 'danger.rawMutation',
   mode: 'mutate',
   description: 'Raw mutation without serialized schemas.',
+  resourceType: 'danger',
   inputSchema: rawSchema,
   handler: () => ({ ok: true }),
 });

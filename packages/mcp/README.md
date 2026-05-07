@@ -6,6 +6,8 @@ Use this package to expose registered Agent Action Runner actions as MCP tools w
 
 By default, only `read`, `draft`, and `dryRun` actions are exported. `mutate` actions require explicit opt-in and approval gating.
 
+The exporter exposes your registered API boundary as tools. It does not execute agent-generated TypeScript or arbitrary code.
+
 Experimental / pre-1.0.
 
 ## Install
@@ -29,6 +31,9 @@ runner.registerAction({
   name: 'math.double',
   mode: 'read',
   description: 'Double a number.',
+  tags: ['math'],
+  resourceType: 'number',
+  riskLevel: 'low',
   inputSchema: z.object({
     value: z.number(),
   }),
@@ -70,6 +75,7 @@ Default behavior:
 - skips actions whose input schema cannot be represented as an object JSON Schema
 - sanitizes tool names by replacing unsupported characters with `_`
 - resolves name collisions with deterministic numeric suffixes
+- includes action metadata in tool descriptions and MCP `_meta`
 
 Example:
 

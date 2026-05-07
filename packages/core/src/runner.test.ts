@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+  ActionTimeoutError,
   ApprovalRequiredError,
   ModeNotAllowedError,
   SchemaValidationError,
+  WorkflowExecutionError,
   createRunner,
   fromStep,
 } from './index.js';
@@ -34,6 +36,40 @@ describe('AgentActionRunner', () => {
       mode: 'read',
       output: { value: 42 },
       approvalId: undefined,
+    });
+  });
+
+  it('keeps action metadata on registered actions', () => {
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'delivery.executeRetry',
+      mode: 'mutate',
+      description: 'Retry approved jobs.',
+      tags: ['delivery', 'retry'],
+      resourceType: 'deliveryJob',
+      riskLevel: 'high',
+      deprecated: 'Use delivery.queueRetry for new workflows.',
+      examples: [
+        {
+          title: 'Retry two jobs',
+          input: { jobIds: ['job_1', 'job_2'] },
+        },
+      ],
+      handler: () => ({ ok: true }),
+    });
+
+    expect(runner.listActions()[0]).toMatchObject({
+      name: 'delivery.executeRetry',
+      tags: ['delivery', 'retry'],
+      resourceType: 'deliveryJob',
+      riskLevel: 'high',
+      deprecated: 'Use delivery.queueRetry for new workflows.',
+      examples: [
+        expect.objectContaining({
+          title: 'Retry two jobs',
+        }),
+      ],
     });
   });
 
@@ -246,6 +282,175 @@ describe('AgentActionRunner', () => {
     });
 
     expect(events).toEqual(['math.double:started', 'math.double:succeeded']);
+  });
+
+  it('retries workflow steps until they succeed', async () => {
+    let attempts = 0;
+    const runner = createRunner({
+      createExecutionId: () => `exec_${attempts + 1}`,
+    });
+
+    runner.registerAction({
+      name: 'unstable.read',
+      mode: 'read',
+      handler: () => {
+        attempts += 1;
+        if (attempts < 2) {
+          throw new Error('temporary failure');
+        }
+
+        return { ok: true, attempts };
+      },
+    });
+
+    const result = await runner.executeWorkflow({
+      userId: 'user_1',
+      workflow: {
+        workflowName: 'retry-read',
+        steps: [
+          {
+            id: 'read',
+            action: 'unstable.read',
+            input: {},
+            retry: {
+              maxAttempts: 2,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(result.steps[0]).toMatchObject({
+      status: 'succeeded',
+      attempts: 2,
+      output: { ok: true, attempts: 2 },
+    });
+  });
+
+  it('fails workflows when retry attempts are exhausted', async () => {
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'unstable.read',
+      mode: 'read',
+      handler: () => {
+        throw new Error('still failing');
+      },
+    });
+
+    await expect(runner.executeWorkflow({
+      userId: 'user_1',
+      workflow: {
+        workflowName: 'retry-fails',
+        steps: [
+          {
+            id: 'read',
+            action: 'unstable.read',
+            input: {},
+            retry: {
+              maxAttempts: 2,
+            },
+          },
+        ],
+      },
+    })).rejects.toBeInstanceOf(WorkflowExecutionError);
+  });
+
+  it('continues after failed steps when continueOnError is enabled', async () => {
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'unstable.read',
+      mode: 'read',
+      handler: () => {
+        throw new Error('expected failure');
+      },
+    });
+    runner.registerAction({
+      name: 'stable.read',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+
+    const result = await runner.executeWorkflow({
+      userId: 'user_1',
+      workflow: {
+        workflowName: 'continue-after-error',
+        steps: [
+          {
+            id: 'unstable',
+            action: 'unstable.read',
+            input: {},
+            continueOnError: true,
+          },
+          {
+            id: 'stable',
+            action: 'stable.read',
+            input: {},
+          },
+        ],
+      },
+    });
+
+    expect(result.steps[0]).toMatchObject({
+      status: 'failed',
+      continued: true,
+      error: {
+        message: 'expected failure',
+      },
+    });
+    expect(result.outputByStep.stable).toEqual({ ok: true });
+  });
+
+  it('times out workflow attempts and emits failed audit attempts', async () => {
+    const events: Array<{ attempt?: number; maxAttempts?: number; status: string; error?: unknown }> = [];
+    const runner = createRunner({
+      audit: (event) => {
+        events.push({
+          attempt: event.attempt,
+          maxAttempts: event.maxAttempts,
+          status: event.status,
+          error: event.error,
+        });
+      },
+    });
+
+    runner.registerAction({
+      name: 'slow.read',
+      mode: 'read',
+      handler: async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 25);
+        });
+        return { ok: true };
+      },
+    });
+
+    try {
+      await runner.executeWorkflow({
+        userId: 'user_1',
+        workflow: {
+          workflowName: 'timeout',
+          steps: [
+            {
+              id: 'slow',
+              action: 'slow.read',
+              input: {},
+              timeoutMs: 1,
+            },
+          ],
+        },
+      });
+      throw new Error('Expected workflow to fail.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(WorkflowExecutionError);
+      expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(ActionTimeoutError);
+    }
+
+    expect(events).toEqual([
+      expect.objectContaining({ attempt: 1, maxAttempts: 1, status: 'started' }),
+      expect.objectContaining({ attempt: 1, maxAttempts: 1, status: 'failed' }),
+    ]);
   });
 
   it('wraps invalid input in a schema validation error', async () => {

@@ -25,11 +25,13 @@ export {
 
 export type {
   ActionDefinition,
+  ActionExample,
   ActionExecutionEvent,
   ActionExecutionInput,
   ActionExecutionResult,
   ActionHandler,
   ActionMode,
+  ActionRiskLevel,
   AgentExecutionContext,
   AgentRunnerOptions,
   ApprovalCheck,
@@ -47,6 +49,11 @@ export type {
   WorkflowExecutionInput,
   WorkflowExecutionResult,
   WorkflowStep,
+  WorkflowStepError,
+  WorkflowStepFailedResult,
+  WorkflowStepRetry,
+  WorkflowStepResult,
+  WorkflowStepSucceededResult,
 } from './types.js';
 
 export type {
@@ -73,6 +80,7 @@ export {
   AgentActionRunnerError,
   ActionAlreadyRegisteredError,
   ActionNotFoundError,
+  ActionTimeoutError,
   ApprovalRequiredError,
   DuplicateWorkflowStepError,
   InvalidStepReferenceError,

@@ -24,6 +24,8 @@ The server listens on port `3004` by default.
 
 This example includes a CLI config, action manifest, generated-style action docs, and a JSON workflow.
 
+The workflow also includes `timeoutMs` and fixed retry controls, so it doubles as a small workflow reliability example.
+
 ```bash
 npm run build --workspace agent-action-runner-delivery-ops-example
 node packages/cli/dist/index.js actions:list --config examples/delivery-ops/agent-runner.config.json
@@ -92,6 +94,8 @@ curl -s http://localhost:3004/agent-runner/actions/delivery.executeRetry/execute
 - `delivery.searchJobs` is a broad read action with filters.
 - `delivery.dryRunRetry` calculates retryable and blocked jobs before mutation.
 - `delivery.executeRetry` is narrow, mutate-mode, and calls `ctx.requireApproval()`.
+- The actions include tags, `resourceType`, and `riskLevel` metadata for CLI docs and MCP descriptions.
+- Workflow retry controls are for transient action failures; `timeoutMs` marks an attempt failed but does not cancel work already running in Node.js.
 - The approval token is bound to `userId`, `actionName`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`.
 - The Express adapter gets user id, allowed modes, approval token, approval context, and metadata from server-side resolver hooks.
 - Client body fields such as `allowedModes` and `approvalContext` are not trusted by default.

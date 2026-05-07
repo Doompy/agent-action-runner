@@ -30,7 +30,7 @@ export type WorkflowInputFor<T> =
 
 export type WorkflowStepOptions = Pick<
   WorkflowStep,
-  'allowedModes' | 'approvalToken' | 'approvalContext'
+  'allowedModes' | 'approvalToken' | 'approvalContext' | 'timeoutMs' | 'retry' | 'continueOnError'
 >;
 
 export type WorkflowBuilderStepContext<Outputs extends WorkflowBuilderOutputs> = {

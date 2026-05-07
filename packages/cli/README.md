@@ -6,6 +6,8 @@ Use the CLI to inspect registered actions, validate workflow JSON, run local rea
 
 The CLI does not auto-discover NestJS decorators, Express routes, Fastify plugins, or TypeScript source. Runner-based commands import compiled ESM JavaScript that exports a core `AgentActionRunner`.
 
+The CLI is for inspecting and smoke-running registered actions. It does not execute agent-generated TypeScript.
+
 Experimental / pre-1.0.
 
 ## Install
@@ -155,6 +157,8 @@ agent-action-runner workflow:validate ./agent-workflows/retry.workflow.json \
 
 Validation catches duplicate step ids, unknown actions, invalid modes, invalid previous step references, and unsupported input values.
 
+It also validates workflow reliability controls such as `timeoutMs`, `retry.maxAttempts`, `retry.delayMs`, and `continueOnError`.
+
 ## Workflow Run
 
 Run a workflow locally:
@@ -222,6 +226,9 @@ Do not write normal logs to stdout from the runner module when serving over stdi
       "name": "delivery.searchJobs",
       "mode": "read",
       "description": "Search delivery jobs by filters.",
+      "tags": ["delivery", "operations"],
+      "resourceType": "deliveryJob",
+      "riskLevel": "low",
       "approvalRequired": false,
       "inputSchema": {
         "type": "object"

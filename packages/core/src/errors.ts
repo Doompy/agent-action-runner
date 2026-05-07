@@ -17,6 +17,12 @@ export class ActionNotFoundError extends AgentActionRunnerError {
   }
 }
 
+export class ActionTimeoutError extends AgentActionRunnerError {
+  constructor(actionName: string, timeoutMs: number) {
+    super(`Action "${actionName}" timed out after ${timeoutMs}ms.`);
+  }
+}
+
 export class ModeNotAllowedError extends AgentActionRunnerError {
   constructor(actionName: string, mode: string) {
     super(`Action "${actionName}" uses mode "${mode}", which is not allowed for this execution.`);

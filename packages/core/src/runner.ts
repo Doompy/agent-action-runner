@@ -1,13 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import {
   ActionAlreadyRegisteredError,
   ActionNotFoundError,
+  ActionTimeoutError,
   ApprovalRequiredError,
   ModeNotAllowedError,
   PolicyRejectedError,
   SchemaValidationError,
   WorkflowExecutionError,
 } from './errors.js';
-import { randomUUID } from 'node:crypto';
 import { createStableHash } from './hash.js';
 import { fromStep, resolveWorkflowInput } from './references.js';
 import type {
@@ -22,7 +23,9 @@ import type {
   ExecutableActionDefinition,
   WorkflowExecutionInput,
   WorkflowExecutionResult,
+  WorkflowStepError,
   WorkflowStepResult,
+  WorkflowStepRetry,
 } from './types.js';
 
 const DEFAULT_ALLOWED_MODES: readonly ActionMode[] = ['read', 'draft', 'dryRun'];
@@ -67,7 +70,7 @@ export class AgentActionRunner {
       throw new ModeNotAllowedError(action.name, action.mode);
     }
 
-    const executionId = this.options.createExecutionId?.() ?? randomUUID();
+    const executionId = request.executionId ?? this.options.createExecutionId?.() ?? randomUUID();
     const input = parseWithSchema(action, 'input', request.input);
     const approvalContext = createApprovalContext({
       action,
@@ -92,13 +95,14 @@ export class AgentActionRunner {
       },
     };
 
-    const startedEvent = createAuditEvent({
+    await this.options.audit?.(createAuditEvent({
       action,
+      attempt: request.attempt,
       context,
       input,
+      maxAttempts: request.maxAttempts,
       status: 'started',
-    });
-    await this.options.audit?.(startedEvent);
+    }));
 
     let approvalId: string | undefined;
 
@@ -123,15 +127,20 @@ export class AgentActionRunner {
         approvalId = approvalResult.approvalId;
       }
 
-      const rawOutput = await action.handler(input, context);
-
+      const rawOutput = await withTimeout(
+        Promise.resolve(action.handler(input, context)),
+        request.timeoutMs,
+        action.name,
+      );
       const output = parseWithSchema(action, 'output', rawOutput);
 
       await this.options.audit?.(createAuditEvent({
         action,
         approvalId,
+        attempt: request.attempt,
         context,
         input,
+        maxAttempts: request.maxAttempts,
         output,
         outputSummary: this.options.summarizeOutput?.(output),
         status: 'succeeded',
@@ -148,9 +157,11 @@ export class AgentActionRunner {
       await this.options.audit?.(createAuditEvent({
         action,
         approvalId,
+        attempt: request.attempt,
         context,
         error,
         input,
+        maxAttempts: request.maxAttempts,
         status: 'failed',
       }));
       throw error;
@@ -165,31 +176,78 @@ export class AgentActionRunner {
     for (const step of request.workflow.steps) {
       const input = resolveWorkflowInput(step.input, outputByStep);
       const allowedModes = step.allowedModes ?? request.allowedModes;
+      const retry = normalizeRetry(step.retry);
+      let completed = false;
+      let lastError: unknown;
+      let lastExecutionId = '';
 
-      try {
-        const result = await this.executeAction({
-          userId: request.userId,
-          workflowId,
-          stepId: step.id,
-          action: step.action,
-          input,
-          allowedModes,
-          approvalToken: step.approvalToken,
-          approvalContext: step.approvalContext,
-          metadata: request.metadata,
-        });
+      for (let attempt = 1; attempt <= retry.maxAttempts; attempt += 1) {
+        const executionId = this.options.createExecutionId?.() ?? randomUUID();
+        lastExecutionId = executionId;
 
-        outputByStep[step.id] = result.output;
+        try {
+          const result = await this.executeAction({
+            userId: request.userId,
+            workflowId,
+            stepId: step.id,
+            action: step.action,
+            input,
+            executionId,
+            attempt,
+            maxAttempts: retry.maxAttempts,
+            timeoutMs: step.timeoutMs,
+            allowedModes,
+            approvalToken: step.approvalToken,
+            approvalContext: step.approvalContext,
+            metadata: request.metadata,
+          });
+
+          outputByStep[step.id] = result.output;
+          stepResults.push({
+            id: step.id,
+            actionName: result.actionName,
+            mode: result.mode,
+            executionId: result.executionId,
+            status: 'succeeded',
+            attempts: attempt,
+            output: result.output,
+          });
+          completed = true;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (attempt < retry.maxAttempts) {
+            await delay(retry.delayMs);
+          }
+        }
+      }
+
+      if (completed) {
+        continue;
+      }
+
+      if (step.continueOnError) {
+        const error = createWorkflowStepError(lastError);
+        const output = {
+          ok: false,
+          error,
+        };
+        outputByStep[step.id] = output;
         stepResults.push({
           id: step.id,
-          actionName: result.actionName,
-          mode: result.mode,
-          executionId: result.executionId,
-          output: result.output,
+          actionName: step.action,
+          mode: this.actions.get(step.action)?.mode,
+          executionId: lastExecutionId || this.options.createExecutionId?.() || randomUUID(),
+          status: 'failed',
+          attempts: retry.maxAttempts,
+          error,
+          continued: true,
+          output,
         });
-      } catch (error) {
-        throw new WorkflowExecutionError(step.id, step.action, error);
+        continue;
       }
+
+      throw new WorkflowExecutionError(step.id, step.action, lastError);
     }
 
     return {
@@ -199,6 +257,64 @@ export class AgentActionRunner {
       outputByStep,
     };
   }
+}
+
+async function withTimeout<Output>(
+  promise: Promise<Output>,
+  timeoutMs: number | undefined,
+  actionName: string,
+): Promise<Output> {
+  if (timeoutMs === undefined) {
+    return promise;
+  }
+
+  return new Promise<Output>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new ActionTimeoutError(actionName, timeoutMs));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
+function normalizeRetry(retry: WorkflowStepRetry | undefined): Required<WorkflowStepRetry> {
+  return {
+    maxAttempts: retry?.maxAttempts ?? 1,
+    delayMs: retry?.delayMs ?? 0,
+  };
+}
+
+async function delay(delayMs: number): Promise<void> {
+  if (delayMs <= 0) {
+    return;
+  }
+
+  await new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
+function createWorkflowStepError(error: unknown): WorkflowStepError {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+
+  return {
+    name: 'Error',
+    message: String(error),
+  };
 }
 
 function parseWithSchema(
@@ -240,9 +356,11 @@ function createApprovalContext(input: {
 function createAuditEvent(input: {
   action: ExecutableActionDefinition;
   approvalId?: string;
+  attempt?: number;
   context: AgentExecutionContext;
   error?: unknown;
   input: unknown;
+  maxAttempts?: number;
   output?: unknown;
   outputSummary?: string;
   status: ActionExecutionEvent['status'];
@@ -254,6 +372,8 @@ function createAuditEvent(input: {
     userId: input.context.userId,
     actionName: input.action.name,
     mode: input.action.mode,
+    attempt: input.attempt,
+    maxAttempts: input.maxAttempts,
     input: input.input,
     output: input.output,
     outputSummary: input.outputSummary,

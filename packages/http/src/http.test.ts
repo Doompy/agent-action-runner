@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   ActionNotFoundError,
+  ActionTimeoutError,
   ModeNotAllowedError,
   SchemaValidationError,
   WorkflowExecutionError,
@@ -22,6 +23,15 @@ describe('@agent-action-runner/http', () => {
       name: 'delivery.searchJobs',
       mode: 'read',
       description: 'Search delivery jobs.',
+      tags: ['delivery'],
+      resourceType: 'deliveryJob',
+      riskLevel: 'low',
+      examples: [
+        {
+          title: 'Search failed jobs',
+          input: { status: ['FAILED'] },
+        },
+      ],
       inputSchema: z.object({ status: z.array(z.string()) }),
       handler: () => ({ jobIds: [] }),
     });
@@ -41,6 +51,16 @@ describe('@agent-action-runner/http', () => {
           mode: 'read',
           description: 'Search delivery jobs.',
           approvalRequired: false,
+          tags: ['delivery'],
+          resourceType: 'deliveryJob',
+          riskLevel: 'low',
+          deprecated: undefined,
+          examples: [
+            {
+              title: 'Search failed jobs',
+              input: { status: ['FAILED'] },
+            },
+          ],
         },
         {
           name: 'delivery.executeRetry',
@@ -215,6 +235,11 @@ describe('@agent-action-runner/http', () => {
     expect(mapAgentRunnerError(new SchemaValidationError('bad', 'input', new Error('bad')))).toMatchObject({
       statusCode: 400,
       response: { error: { code: 'SCHEMA_VALIDATION_FAILED' } },
+    });
+
+    expect(mapAgentRunnerError(new ActionTimeoutError('slow', 100))).toMatchObject({
+      statusCode: 408,
+      response: { error: { code: 'ACTION_TIMEOUT' } },
     });
 
     expect(mapAgentRunnerError(new WorkflowExecutionError(

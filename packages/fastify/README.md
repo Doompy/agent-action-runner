@@ -4,6 +4,8 @@ Fastify adapter for Agent Action Runner.
 
 Use this package to expose a core `AgentActionRunner` through Fastify routes while resolving user identity, allowed modes, approval tokens, approval context, and metadata on the server.
 
+The plugin exposes registered actions. It does not execute agent-generated code or discover arbitrary Fastify routes.
+
 Experimental / pre-1.0.
 
 ## Install
@@ -56,7 +58,7 @@ With the plugin registered using `prefix: '/agent-runner'`, the routes are:
 | `POST` | `/agent-runner/actions/:name/execute` | Executes one action. |
 | `POST` | `/agent-runner/workflows/execute` | Executes a JSON workflow. |
 
-`GET /actions` returns action metadata only. Schemas are not serialized.
+`GET /actions` returns action metadata only. Schemas are not serialized. Metadata can include tags, resource type, risk level, deprecation, and examples.
 
 ## Execute An Action
 
@@ -167,6 +169,7 @@ Common status mappings:
 |---|---|
 | action not found | `404` |
 | schema validation failed | `400` |
+| action timeout | `408` |
 | invalid step reference | `400` |
 | mode not allowed | `403` |
 | approval required | `403` |

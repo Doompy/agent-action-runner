@@ -48,7 +48,14 @@ describe('workflow builder', () => {
       })
       .step('dryRun', actions.dryRunRetry, ({ fromStep }) => ({
         jobIds: fromStep('jobs', '/jobIds'),
-      }))
+      }), {
+        timeoutMs: 1000,
+        retry: {
+          maxAttempts: 2,
+          delayMs: 5,
+        },
+        continueOnError: true,
+      })
       .build();
 
     expect(workflow).toEqual({
@@ -70,6 +77,12 @@ describe('workflow builder', () => {
               path: '/jobIds',
             },
           },
+          timeoutMs: 1000,
+          retry: {
+            maxAttempts: 2,
+            delayMs: 5,
+          },
+          continueOnError: true,
         },
       ],
     });

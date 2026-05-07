@@ -7,6 +7,11 @@
       "input": {
         "status": ["FAILED", "DLQ"],
         "campaignId": "campaign_spring"
+      },
+      "timeoutMs": 1000,
+      "retry": {
+        "maxAttempts": 2,
+        "delayMs": 50
       }
     },
     {
@@ -18,6 +23,11 @@
           "path": "/jobIds"
         },
         "reason": "Recover transient CMS failures."
+      },
+      "timeoutMs": 1000,
+      "retry": {
+        "maxAttempts": 2,
+        "delayMs": 50
       }
     }
   ]

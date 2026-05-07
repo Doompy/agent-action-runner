@@ -4,6 +4,8 @@ Framework-agnostic action registry and JSON workflow runner for TypeScript backe
 
 Use this package when you want an agent to call existing service logic through named, schema-validated actions instead of giving the agent direct database access, internal API access, or arbitrary code execution.
 
+Core does not execute agent-generated TypeScript. It only runs handlers that your application registered as actions.
+
 Experimental / pre-1.0. Public APIs may change while the action, workflow, and approval contracts settle.
 
 ## Install
@@ -28,6 +30,8 @@ npm install @agent-action-runner/core zod
 - Restricted step output references.
 - Type-safe workflow authoring helpers.
 - Static workflow validation helpers.
+- Action metadata for API reuse documentation.
+- Workflow retry, timeout, and continue-on-error controls.
 
 ## Quickstart
 
@@ -118,6 +122,15 @@ runner.registerAction({
   name: 'report.generateDraft',
   mode: 'draft',
   description: 'Create a report draft for review.',
+  tags: ['reports'],
+  resourceType: 'report',
+  riskLevel: 'low',
+  examples: [
+    {
+      title: 'Create a report draft',
+      input: { reportId: 'report_1' },
+    },
+  ],
   inputSchema: z.object({
     reportId: z.string(),
   }),
@@ -173,6 +186,11 @@ Workflows are plain JSON data. They execute sequentially, and each step can refe
       "action": "delivery.searchJobs",
       "input": {
         "status": ["FAILED"]
+      },
+      "timeoutMs": 1000,
+      "retry": {
+        "maxAttempts": 2,
+        "delayMs": 50
       }
     },
     {
@@ -196,6 +214,8 @@ fromStep('jobs', '/jobIds');
 ```
 
 Paths are JSON Pointer strings. References can only resolve against previous step outputs.
+
+`retry.maxAttempts` includes the first attempt. `timeoutMs` marks the attempt as failed after the configured duration; it does not cancel underlying Node.js work that has already started. Use `continueOnError: true` only when downstream steps can safely consume a failed step result.
 
 ## Workflow Builder
 
@@ -268,6 +288,7 @@ Validation catches:
 - duplicate step ids
 - unknown actions when an action catalog is supplied
 - invalid action modes
+- invalid retry, timeout, or continue-on-error controls
 - references to missing or future steps
 - unsupported input values
 
@@ -347,6 +368,8 @@ const runner = createRunner({
 
 The audit hook receives `started`, `succeeded`, and `failed` events.
 
+Workflow retries add `attempt` and `maxAttempts` to audit events.
+
 ```ts
 import { createAuditHook, createRunner, type AuditStore } from '@agent-action-runner/core';
 
@@ -378,6 +401,7 @@ The core package exports typed errors for common failure paths:
 
 - `ActionAlreadyRegisteredError`
 - `ActionNotFoundError`
+- `ActionTimeoutError`
 - `ModeNotAllowedError`
 - `PolicyRejectedError`
 - `ApprovalRequiredError`
@@ -400,7 +424,7 @@ Common exports:
 - `validateWorkflowDefinition`
 - `createStableHash`
 - `createAuditHook`
-- core types such as `ActionDefinition`, `WorkflowDefinition`, `ActionMode`, `AgentExecutionContext`, `ApprovalContext`, `AuditStore`
+- core types such as `ActionDefinition`, `ActionExample`, `ActionRiskLevel`, `WorkflowDefinition`, `ActionMode`, `AgentExecutionContext`, `ApprovalContext`, `AuditStore`
 
 ## Examples
 

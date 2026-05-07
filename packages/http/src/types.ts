@@ -1,5 +1,7 @@
 import type {
+  ActionExample,
   ActionMode,
+  ActionRiskLevel,
   AgentActionRunner,
   ApprovalContextOverrides,
   WorkflowDefinition,
@@ -30,6 +32,11 @@ export type AgentHttpActionSummary = {
   readonly mode: ActionMode;
   readonly description?: string;
   readonly approvalRequired: boolean;
+  readonly tags?: readonly string[];
+  readonly resourceType?: string;
+  readonly riskLevel?: ActionRiskLevel;
+  readonly deprecated?: boolean | string;
+  readonly examples?: readonly ActionExample[];
 };
 
 export type AgentHttpActionExecuteBody = {

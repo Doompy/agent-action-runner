@@ -15,7 +15,10 @@ export type WorkflowValidationIssueCode =
   | 'unknownAction'
   | 'invalidMode'
   | 'invalidStepReference'
-  | 'invalidInputValue';
+  | 'invalidInputValue'
+  | 'invalidTimeout'
+  | 'invalidRetry'
+  | 'invalidContinueOnError';
 
 export type WorkflowValidationIssue = {
   readonly code: WorkflowValidationIssueCode;
@@ -123,6 +126,23 @@ export function validateWorkflowDefinition(
       validateAllowedModes(step.allowedModes, `${stepPath}/allowedModes`, stepId, issues);
     }
 
+    if ('timeoutMs' in step) {
+      validateTimeoutMs(step.timeoutMs, `${stepPath}/timeoutMs`, stepId, issues);
+    }
+
+    if ('retry' in step) {
+      validateRetry(step.retry, `${stepPath}/retry`, stepId, issues);
+    }
+
+    if ('continueOnError' in step && typeof step.continueOnError !== 'boolean') {
+      issues.push({
+        code: 'invalidContinueOnError',
+        message: 'continueOnError must be a boolean.',
+        path: `${stepPath}/continueOnError`,
+        stepId,
+      });
+    }
+
     if (!('input' in step)) {
       issues.push({
         code: 'invalidInputValue',
@@ -175,6 +195,68 @@ function validateAllowedModes(
       });
     }
   });
+}
+
+function validateTimeoutMs(
+  value: unknown,
+  path: string,
+  stepId: string | undefined,
+  issues: WorkflowValidationIssue[],
+): void {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    issues.push({
+      code: 'invalidTimeout',
+      message: 'timeoutMs must be a positive integer.',
+      path,
+      stepId,
+    });
+  }
+}
+
+function validateRetry(
+  value: unknown,
+  path: string,
+  stepId: string | undefined,
+  issues: WorkflowValidationIssue[],
+): void {
+  if (!isRecord(value)) {
+    issues.push({
+      code: 'invalidRetry',
+      message: 'retry must be an object.',
+      path,
+      stepId,
+    });
+    return;
+  }
+
+  if (
+    typeof value.maxAttempts !== 'number'
+    || !Number.isInteger(value.maxAttempts)
+    || value.maxAttempts <= 0
+  ) {
+    issues.push({
+      code: 'invalidRetry',
+      message: 'retry.maxAttempts must be a positive integer.',
+      path: `${path}/maxAttempts`,
+      stepId,
+    });
+  }
+
+  if (
+    'delayMs' in value
+    && (
+      typeof value.delayMs !== 'number'
+      || !Number.isInteger(value.delayMs)
+      || value.delayMs < 0
+    )
+  ) {
+    issues.push({
+      code: 'invalidRetry',
+      message: 'retry.delayMs must be a non-negative integer.',
+      path: `${path}/delayMs`,
+      stepId,
+    });
+  }
 }
 
 function validateWorkflowInputValue(

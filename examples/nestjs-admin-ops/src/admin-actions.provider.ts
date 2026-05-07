@@ -31,6 +31,15 @@ export class AdminOpsAgentActions {
     name: 'admin.searchUsers',
     mode: 'read',
     description: 'Search admin users by query and status.',
+    tags: ['admin', 'users'],
+    resourceType: 'adminUser',
+    riskLevel: 'low',
+    examples: [
+      {
+        title: 'Search active users',
+        input: { status: 'active' },
+      },
+    ],
     inputSchema: SearchUsersInputSchema,
     outputSchema: SearchUsersOutputSchema,
   })
@@ -42,6 +51,9 @@ export class AdminOpsAgentActions {
     name: 'admin.dryRunDisableUser',
     mode: 'dryRun',
     description: 'Preview the impact of disabling a user.',
+    tags: ['admin', 'users', 'approval'],
+    resourceType: 'adminUser',
+    riskLevel: 'medium',
     inputSchema: DryRunDisableUserInputSchema,
     outputSchema: DryRunDisableUserOutputSchema,
   })
@@ -53,6 +65,10 @@ export class AdminOpsAgentActions {
     name: 'admin.disableUser',
     mode: 'mutate',
     description: 'Disable a user after approval.',
+    tags: ['admin', 'users'],
+    resourceType: 'adminUser',
+    riskLevel: 'high',
+    approvalRequired: true,
     inputSchema: DisableUserInputSchema,
     outputSchema: DisableUserOutputSchema,
   })

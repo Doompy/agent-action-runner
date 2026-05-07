@@ -4,7 +4,9 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type {
+  ActionExample,
   ActionMode,
+  ActionRiskLevel,
   AgentActionRunner,
   WorkflowDefinition,
   WorkflowValidationAction,
@@ -15,6 +17,7 @@ import { z } from 'zod';
 const DEFAULT_CONFIG_FILE = 'agent-runner.config.json';
 const DEFAULT_ALLOWED_MODES: readonly ActionMode[] = ['read', 'draft', 'dryRun'];
 const ACTION_MODES: readonly ActionMode[] = ['read', 'draft', 'dryRun', 'mutate'];
+const ACTION_RISK_LEVELS: readonly ActionRiskLevel[] = ['low', 'medium', 'high'];
 
 export type CliOptions = {
   readonly argv: readonly string[];
@@ -43,6 +46,11 @@ export type ActionManifestEntry = {
   readonly name: string;
   readonly mode: ActionMode;
   readonly description?: string;
+  readonly tags?: readonly string[];
+  readonly resourceType?: string;
+  readonly riskLevel?: ActionRiskLevel;
+  readonly deprecated?: boolean | string;
+  readonly examples?: readonly ActionExample[];
   readonly approvalRequired?: boolean;
   readonly inputSchema?: unknown;
   readonly outputSchema?: unknown;
@@ -68,6 +76,11 @@ type McpPreviewEntry = {
   readonly actionName: string;
   readonly mode: ActionMode;
   readonly approvalRequired: boolean;
+  readonly tags?: readonly string[];
+  readonly resourceType?: string;
+  readonly riskLevel?: ActionRiskLevel;
+  readonly deprecated?: boolean | string;
+  readonly examples?: readonly ActionExample[];
   readonly exported: boolean;
   readonly toolName?: string;
   readonly reason?: 'modeNotExposed' | 'mutationNotExposed' | 'schemaMissing' | 'schemaNotSerializable';
@@ -186,8 +199,9 @@ async function runActionsList(context: CommandContext, args: ParsedArgs): Promis
   context.stdout('Registered Actions\n\n');
   for (const action of manifest.actions) {
     const approval = isApprovalRequired(action) ? ' approvalRequired' : '';
+    const risk = action.riskLevel ? ` ${action.riskLevel}` : '';
     const description = action.description ? ` - ${action.description}` : '';
-    context.stdout(`- ${action.name.padEnd(32)} ${action.mode}${approval}${description}\n`);
+    context.stdout(`- ${action.name.padEnd(32)} ${action.mode}${risk}${approval}${description}\n`);
   }
 }
 
@@ -212,6 +226,11 @@ async function runActionsInspect(context: CommandContext, args: ParsedArgs): Pro
     `Action: ${action.name}`,
     `Mode: ${action.mode}`,
     `Approval required: ${isApprovalRequired(action) ? 'yes' : 'no'}`,
+    `Risk level: ${action.riskLevel ?? ''}`,
+    `Resource type: ${action.resourceType ?? ''}`,
+    `Tags: ${action.tags?.join(', ') ?? ''}`,
+    `Deprecated: ${formatDeprecated(action.deprecated)}`,
+    `Examples: ${action.examples?.length ?? 0}`,
     `Description: ${action.description ?? ''}`,
     `Input schema: ${schemaStateForDisplay(action, 'input')}`,
     `Output schema: ${schemaStateForDisplay(action, 'output')}`,
@@ -366,6 +385,11 @@ async function createRunnerMcpPreview(
         actionName: entry.actionName,
         approvalRequired: entry.approvalRequired,
         exported: true,
+        tags: entry.tags,
+        resourceType: entry.resourceType,
+        riskLevel: entry.riskLevel,
+        deprecated: entry.deprecated,
+        examples: entry.examples,
         mode: entry.mode,
         toolName: entry.name,
       };
@@ -375,6 +399,11 @@ async function createRunnerMcpPreview(
       actionName: entry.actionName,
       approvalRequired: entry.approvalRequired,
       exported: false,
+      tags: entry.tags,
+      resourceType: entry.resourceType,
+      riskLevel: entry.riskLevel,
+      deprecated: entry.deprecated,
+      examples: entry.examples,
       mode: entry.mode,
       reason: entry.skipReason,
     };
@@ -429,6 +458,11 @@ function createManifestMcpPreview(
       actionName: action.name,
       mode: action.mode,
       approvalRequired,
+      tags: action.tags,
+      resourceType: action.resourceType,
+      riskLevel: action.riskLevel,
+      deprecated: action.deprecated,
+      examples: action.examples,
     };
 
     if (action.mode === 'mutate' && (!options.exposeMutations || !approvalRequired)) {
@@ -474,6 +508,13 @@ function createDoctorWarnings(manifest: ActionManifest): readonly DoctorWarning[
         actionName: action.name,
         code: 'mutateWithoutApproval',
         message: 'mutate action should set approvalRequired.',
+      });
+    }
+    if (action.mode === 'mutate' && !action.riskLevel) {
+      warnings.push({
+        actionName: action.name,
+        code: 'mutateMissingRiskLevel',
+        message: 'mutate action should declare a riskLevel.',
       });
     }
     if (!action.description) {
@@ -533,10 +574,10 @@ function createActionsMarkdown(manifest: ActionManifest): string {
   return [
     '# Agent Actions',
     '',
-    '| Action | Mode | Approval | Input | Output | Description |',
-    '|---|---|---|---|---|---|',
+    '| Action | Mode | Risk | Resource | Approval | Tags | Input | Output | Description |',
+    '|---|---|---|---|---|---|---|---|---|',
     ...manifest.actions.map((action) => (
-      `| \`${action.name}\` | ${action.mode} | ${isApprovalRequired(action) ? 'required' : 'not required'} | ${schemaStateForDisplay(action, 'input')} | ${schemaStateForDisplay(action, 'output')} | ${action.description ?? ''} |`
+      `| \`${action.name}\` | ${action.mode} | ${action.riskLevel ?? ''} | ${action.resourceType ?? ''} | ${isApprovalRequired(action) ? 'required' : 'not required'} | ${action.tags?.join(', ') ?? ''} | ${schemaStateForDisplay(action, 'input')} | ${schemaStateForDisplay(action, 'output')} | ${action.description ?? ''} |`
     )),
     '',
   ].join('\n');
@@ -618,6 +659,11 @@ function parseManifestAction(value: unknown): ActionManifestEntry {
     name: value.name,
     mode: value.mode as ActionMode,
     description: typeof value.description === 'string' ? value.description : undefined,
+    tags: parseStringArray(value.tags),
+    resourceType: typeof value.resourceType === 'string' ? value.resourceType : undefined,
+    riskLevel: parseRiskLevel(value.riskLevel),
+    deprecated: parseDeprecated(value.deprecated),
+    examples: parseActionExamples(value.examples),
     approvalRequired: typeof value.approvalRequired === 'boolean' ? value.approvalRequired : undefined,
     inputSchema: value.inputSchema,
     outputSchema: value.outputSchema,
@@ -632,6 +678,45 @@ function parseSchemaStatus(value: unknown): SchemaStatus | undefined {
     : undefined;
 }
 
+function parseStringArray(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const values = value.filter((item): item is string => typeof item === 'string');
+  return values.length > 0 ? values : undefined;
+}
+
+function parseRiskLevel(value: unknown): ActionRiskLevel | undefined {
+  return typeof value === 'string' && ACTION_RISK_LEVELS.includes(value as ActionRiskLevel)
+    ? value as ActionRiskLevel
+    : undefined;
+}
+
+function parseDeprecated(value: unknown): boolean | string | undefined {
+  return typeof value === 'boolean' || typeof value === 'string' ? value : undefined;
+}
+
+function parseActionExamples(value: unknown): readonly ActionExample[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const examples = value.flatMap((item): ActionExample[] => {
+    if (!isRecord(item) || typeof item.title !== 'string' || !('input' in item)) {
+      return [];
+    }
+
+    return [{
+      title: item.title,
+      description: typeof item.description === 'string' ? item.description : undefined,
+      input: item.input,
+    }];
+  });
+
+  return examples.length > 0 ? examples : undefined;
+}
+
 async function createManifestFromRunner(runner: AgentActionRunner): Promise<ActionManifest> {
   return {
     version: 1,
@@ -643,6 +728,11 @@ async function createManifestFromRunner(runner: AgentActionRunner): Promise<Acti
         name: action.name,
         mode: action.mode,
         description: action.description,
+        tags: action.tags,
+        resourceType: action.resourceType,
+        riskLevel: action.riskLevel,
+        deprecated: action.deprecated,
+        examples: action.examples,
         approvalRequired: action.approvalRequired,
         inputSchema: inputSchema.schema,
         outputSchema: outputSchema.schema,
@@ -841,10 +931,19 @@ function createExampleManifest(): ActionManifest {
     version: 1,
     actions: [
       {
-        name: 'delivery.searchJobs',
-        mode: 'read',
-        description: 'Search delivery jobs by filters.',
-        approvalRequired: false,
+      name: 'delivery.searchJobs',
+      mode: 'read',
+      description: 'Search delivery jobs by filters.',
+      tags: ['delivery', 'operations'],
+      resourceType: 'deliveryJob',
+      riskLevel: 'low',
+      examples: [
+        {
+          title: 'Find failed jobs',
+          input: { status: ['FAILED'] },
+        },
+      ],
+      approvalRequired: false,
         inputSchema: {
           type: 'object',
           properties: {
@@ -859,10 +958,13 @@ function createExampleManifest(): ActionManifest {
         },
       },
       {
-        name: 'delivery.dryRunRetry',
-        mode: 'dryRun',
-        description: 'Validate retry candidates before mutation.',
-        approvalRequired: false,
+      name: 'delivery.dryRunRetry',
+      mode: 'dryRun',
+      description: 'Validate retry candidates before mutation.',
+      tags: ['delivery', 'retry'],
+      resourceType: 'deliveryJob',
+      riskLevel: 'medium',
+      approvalRequired: false,
         inputSchema: {
           type: 'object',
           properties: {
@@ -877,10 +979,13 @@ function createExampleManifest(): ActionManifest {
         },
       },
       {
-        name: 'delivery.executeRetry',
-        mode: 'mutate',
-        description: 'Execute retry for approved delivery jobs.',
-        approvalRequired: true,
+      name: 'delivery.executeRetry',
+      mode: 'mutate',
+      description: 'Execute retry for approved delivery jobs.',
+      tags: ['delivery', 'retry'],
+      resourceType: 'deliveryJob',
+      riskLevel: 'high',
+      approvalRequired: true,
         inputSchema: {
           type: 'object',
           properties: {
@@ -956,6 +1061,14 @@ function getSchemaStatus(action: ActionManifestEntry, target: 'input' | 'output'
 
 function schemaStateForDisplay(action: ActionManifestEntry, target: 'input' | 'output'): string {
   return getSchemaStatus(action, target);
+}
+
+function formatDeprecated(value: boolean | string | undefined): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return value ? 'yes' : '';
 }
 
 async function writeJsonFile(filePath: string, value: unknown): Promise<void> {

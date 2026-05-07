@@ -4,6 +4,8 @@ Express adapter for Agent Action Runner.
 
 Use this package to expose a core `AgentActionRunner` through HTTP endpoints in an Express application while keeping user identity, allowed modes, approval tokens, approval context, and metadata under server-side control.
 
+The adapter exposes registered actions. It does not execute agent-generated code or discover arbitrary Express routes.
+
 Experimental / pre-1.0.
 
 ## Install
@@ -64,7 +66,10 @@ With the adapter mounted at `/agent-runner`, the routes are:
       "name": "delivery.searchJobs",
       "mode": "read",
       "description": "Search delivery jobs by status.",
-      "approvalRequired": false
+      "approvalRequired": false,
+      "tags": ["delivery", "operations"],
+      "resourceType": "deliveryJob",
+      "riskLevel": "low"
     }
   ]
 }
@@ -184,6 +189,7 @@ Common status mappings:
 |---|---|
 | action not found | `404` |
 | schema validation failed | `400` |
+| action timeout | `408` |
 | invalid step reference | `400` |
 | mode not allowed | `403` |
 | approval required | `403` |

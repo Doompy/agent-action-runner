@@ -4,6 +4,8 @@ A safe, application-native action and workflow runner for TypeScript backends.
 
 Expose existing service logic as agent-callable actions with schema validation, policy guards, dry-run, human approval, and audit logging without giving agents direct database, internal API, or arbitrary code execution access.
 
+Agent Action Runner is about controlled API reuse. It does not run agent-generated TypeScript or arbitrary code; agents can only call actions your application has registered.
+
 ## Status
 
 Experimental / pre-1.0. Public APIs may change while the action, workflow, and approval contracts settle.
@@ -18,6 +20,8 @@ This repository starts with a framework-agnostic core package and first-party fr
 - Action mode enforcement
 - Policy, approval, and audit hooks
 - Restricted step output references
+- Action metadata for API reuse documentation and MCP descriptions
+- Workflow retry, timeout, and continue-on-error controls
 - NestJS `@AgentAction()` provider discovery
 - Express and Fastify HTTP adapters
 
@@ -32,6 +36,22 @@ This repository starts with a framework-agnostic core package and first-party fr
 | `@agent-action-runner/fastify` | Fastify plugin for listing actions and executing actions or workflows. |
 | `@agent-action-runner/mcp` | MCP exporter that turns eligible registered actions into MCP tools. |
 | `@agent-action-runner/cli` | Local development CLI for manifests, workflow validation, runner smoke-runs, docs generation, and MCP previews. |
+
+## API Reuse Boundary
+
+The recommended shape is:
+
+```txt
+existing service method
+  -> registered Agent Action
+  -> JSON Workflow
+  -> policy / approval / audit
+  -> HTTP, CLI, or MCP exposure
+```
+
+Your backend remains responsible for authentication, authorization, transactions, and side effects. The runner gives agents a narrow boundary for calling existing business logic safely.
+
+See [API Reuse Guide](./docs/api-reuse.md) for the recommended service wrapping pattern.
 
 ## Core Quickstart
 
@@ -93,6 +113,11 @@ const result = await runner.executeWorkflow({
           from: '2026-05-01',
           to: '2026-05-06',
         },
+        timeoutMs: 1000,
+        retry: {
+          maxAttempts: 2,
+          delayMs: 50,
+        },
       },
       {
         id: 'dryRun',
@@ -148,6 +173,28 @@ const workflow = defineWorkflow('retry-failed-jobs')
 ```
 
 The builder does not execute TypeScript. It only creates a `WorkflowDefinition` for the existing JSON workflow runner.
+
+## Workflow Reliability
+
+Workflow steps can define simple execution controls:
+
+```json
+{
+  "id": "jobs",
+  "action": "delivery.searchJobs",
+  "input": {
+    "status": ["FAILED"]
+  },
+  "timeoutMs": 1000,
+  "retry": {
+    "maxAttempts": 2,
+    "delayMs": 50
+  },
+  "continueOnError": false
+}
+```
+
+`retry.maxAttempts` includes the first attempt. `timeoutMs` marks an attempt as failed after the duration, but it does not forcibly cancel underlying Node.js work that has already started.
 
 ## CLI Quickstart
 

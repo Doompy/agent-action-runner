@@ -24,7 +24,7 @@ Official HTTP adapters expose:
 | `POST` | `/actions/:name/execute` | Executes one action. |
 | `POST` | `/workflows/execute` | Executes a JSON workflow. |
 
-`GET /actions` intentionally omits schemas.
+`GET /actions` intentionally omits schemas. It can include action metadata such as tags, resource type, risk level, deprecation, and examples.
 
 ```json
 {
@@ -34,7 +34,10 @@ Official HTTP adapters expose:
       "name": "delivery.searchJobs",
       "mode": "read",
       "description": "Search delivery jobs by status.",
-      "approvalRequired": false
+      "approvalRequired": false,
+      "tags": ["delivery", "operations"],
+      "resourceType": "deliveryJob",
+      "riskLevel": "low"
     }
   ]
 }
@@ -163,6 +166,7 @@ Error:
 |---|---:|---|
 | `ActionNotFoundError` | `404` | `ACTION_NOT_FOUND` |
 | `SchemaValidationError` | `400` | `SCHEMA_VALIDATION_FAILED` |
+| `ActionTimeoutError` | `408` | `ACTION_TIMEOUT` |
 | `InvalidStepReferenceError` | `400` | `INVALID_STEP_REFERENCE` |
 | `ModeNotAllowedError` | `403` | `MODE_NOT_ALLOWED` |
 | `ApprovalRequiredError` | `403` | `APPROVAL_REQUIRED` |

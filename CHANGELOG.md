@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.6.0] - 2026-05-07
+
+### Added
+
+- Added action metadata fields to `@agent-action-runner/core`: `tags`, `resourceType`, `riskLevel`, `deprecated`, and `examples`.
+- Added workflow reliability controls: `timeoutMs`, fixed retry via `retry.maxAttempts` / `retry.delayMs`, and `continueOnError`.
+- Added `ActionTimeoutError` and HTTP mapping to `408 ACTION_TIMEOUT`.
+- Added retry attempt metadata to action audit events.
+- Added `docs/api-reuse.md` to document the existing API/service reuse model.
+
+### Changed
+
+- Bumped all public packages to `0.6.0` and updated internal peer dependency ranges to `^0.6.0`.
+- Updated HTTP action lists, MCP catalogs/reports, MCP tool descriptions, and CLI manifest/docs/doctor output to include action metadata.
+- Updated operational examples with action metadata and added retry/timeout controls to the delivery ops workflow.
+- Clarified docs that Agent Action Runner does not execute agent-generated TypeScript or arbitrary code.
+
+### Notes
+
+- `timeoutMs` is a failure boundary, not a cancellation primitive for work already running in Node.js.
+- TypeScript Runner, visual builder, Next.js adapter, Redis/Prisma packages, loop/parallel/rollback DSL, and arbitrary code execution remain out of scope.
+
 ## [0.5.0] - 2026-05-07
 
 ### Added
