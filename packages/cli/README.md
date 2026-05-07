@@ -2,7 +2,11 @@
 
 CLI for Agent Action Runner local development.
 
-The CLI supports manifest-based inspection plus compiled runner module smoke-runs. It does not auto-discover NestJS, Express, or Fastify applications.
+Use the CLI to inspect registered actions, validate workflow JSON, run local read/dryRun smoke workflows, generate action docs, and preview or serve MCP tools. It is a development helper, not a production scheduler or authorization layer.
+
+The CLI does not auto-discover NestJS decorators, Express routes, Fastify plugins, or TypeScript source. Runner-based commands import compiled ESM JavaScript that exports a core `AgentActionRunner`.
+
+Experimental / pre-1.0.
 
 ## Install
 
@@ -10,29 +14,247 @@ The CLI supports manifest-based inspection plus compiled runner module smoke-run
 npm install -D @agent-action-runner/cli @modelcontextprotocol/sdk
 ```
 
-## Commands
+`@modelcontextprotocol/sdk` is a peer dependency used by `mcp:serve`.
+
+You can also run commands with:
+
+```bash
+npx @agent-action-runner/cli --help
+```
+
+The binary name is `agent-action-runner`.
+
+## Typical Local Loop
+
+```txt
+compile runner module
+  -> export/inspect action manifest
+  -> validate workflow JSON
+  -> run read/dryRun workflow smoke test
+  -> preview or serve MCP tools
+```
+
+## Initialize Files
 
 ```bash
 agent-action-runner init
+```
+
+Creates:
+
+```txt
+agent-runner.config.json
+.agent-runner/actions.json
+agent-workflows/example.workflow.json
+```
+
+Use `--force` to overwrite existing generated files.
+
+## Config
+
+The CLI reads `agent-runner.config.json` by default.
+
+```json
+{
+  "manifest": "./.agent-runner/actions.json",
+  "runner": "./dist/agent-runner.js",
+  "workflowsDir": "./agent-workflows",
+  "mcp": {
+    "exposeModes": ["read", "draft", "dryRun"],
+    "exposeMutations": false
+  }
+}
+```
+
+Use `--config <path>` to point at a different config file. JSON config is currently supported; TypeScript config loading is intentionally out of scope.
+
+## Manifest-Based Commands
+
+List actions:
+
+```bash
 agent-action-runner actions:list
-agent-action-runner actions:list --runner ./dist/agent-runner.js
+agent-action-runner actions:list --json
+```
+
+Inspect one action:
+
+```bash
 agent-action-runner actions:inspect delivery.searchJobs
-agent-action-runner actions:export --runner ./dist/agent-runner.js --out ./.agent-runner/actions.json
-agent-action-runner workflow:validate ./agent-workflows/example.workflow.json
-agent-action-runner workflow:validate ./agent-workflows/example.workflow.json --runner ./dist/agent-runner.js --format json
-agent-action-runner workflow:run ./agent-workflows/example.workflow.json --runner ./dist/agent-runner.js
+agent-action-runner actions:inspect delivery.searchJobs --json
+```
+
+Preview MCP export from a manifest:
+
+```bash
 agent-action-runner mcp:preview
+agent-action-runner mcp:preview --expose-mutations
+agent-action-runner mcp:preview --json
+```
+
+Run safety checks:
+
+```bash
+agent-action-runner doctor
+agent-action-runner doctor --json
+```
+
+Generate Markdown docs:
+
+```bash
+agent-action-runner docs:generate
+agent-action-runner docs:generate --out docs/agent-actions.md
+```
+
+## Runner-Based Commands
+
+Runner modules must be compiled ESM JavaScript and export either:
+
+```ts
+export const runner = createRunner();
+```
+
+or:
+
+```ts
+export default runner;
+```
+
+Export a manifest from a live runner:
+
+```bash
+agent-action-runner actions:export \
+  --runner ./dist/agent-runner.js \
+  --out ./.agent-runner/actions.json
+```
+
+List or inspect directly from the runner:
+
+```bash
+agent-action-runner actions:list --runner ./dist/agent-runner.js
+agent-action-runner actions:inspect delivery.searchJobs --runner ./dist/agent-runner.js
+```
+
+Serializable Zod schemas are written as JSON Schema. Non-serializable schemas are marked with `schemaNotSerializable`.
+
+## Workflow Validation
+
+Validate workflow JSON against the manifest:
+
+```bash
+agent-action-runner workflow:validate ./agent-workflows/retry.workflow.json
+```
+
+Validate against the actual compiled runner action catalog:
+
+```bash
+agent-action-runner workflow:validate ./agent-workflows/retry.workflow.json \
+  --runner ./dist/agent-runner.js \
+  --format json
+```
+
+Validation catches duplicate step ids, unknown actions, invalid modes, invalid previous step references, and unsupported input values.
+
+## Workflow Run
+
+Run a workflow locally:
+
+```bash
+agent-action-runner workflow:run ./agent-workflows/retry.workflow.json \
+  --runner ./dist/agent-runner.js
+```
+
+Defaults:
+
+- `userId`: `AGENT_RUNNER_USER_ID` or `local_user`
+- allowed modes: `read`, `draft`, `dryRun`
+- output: JSON
+
+Options:
+
+```bash
+agent-action-runner workflow:run ./agent-workflows/retry.workflow.json \
+  --runner ./dist/agent-runner.js \
+  --user-id operator_1 \
+  --metadata-json '{"source":"local-cli"}'
+```
+
+`mutate` is blocked unless you pass `--allow-mutate`, and the core approval hook still decides whether mutation succeeds.
+
+```bash
+agent-action-runner workflow:run ./agent-workflows/retry.workflow.json \
+  --runner ./dist/agent-runner.js \
+  --allow-mutate
+```
+
+Use mutate mode only for intentional local/dev smoke-runs.
+
+## MCP Commands
+
+Preview tools from a manifest or runner:
+
+```bash
+agent-action-runner mcp:preview
+agent-action-runner mcp:preview --runner ./dist/agent-runner.js --json
+```
+
+Serve the runner over MCP stdio:
+
+```bash
 agent-action-runner mcp:serve --runner ./dist/agent-runner.js
+```
+
+Use `AGENT_RUNNER_USER_ID` or `--user-id` to set the server-side user id.
+
+```bash
+AGENT_RUNNER_USER_ID=demo_user agent-action-runner mcp:serve --runner ./dist/agent-runner.js
+```
+
+Do not write normal logs to stdout from the runner module when serving over stdio. stdout is reserved for the MCP transport.
+
+## Manifest Format
+
+```json
+{
+  "version": 1,
+  "actions": [
+    {
+      "name": "delivery.searchJobs",
+      "mode": "read",
+      "description": "Search delivery jobs by filters.",
+      "approvalRequired": false,
+      "inputSchema": {
+        "type": "object"
+      },
+      "outputSchema": {
+        "type": "object"
+      }
+    }
+  ]
+}
+```
+
+## Commands
+
+```txt
+agent-action-runner init
+agent-action-runner actions:list
+agent-action-runner actions:inspect <actionName>
+agent-action-runner actions:export --runner <file>
+agent-action-runner workflow:validate <file>
+agent-action-runner workflow:run <file>
+agent-action-runner mcp:preview
+agent-action-runner mcp:serve
 agent-action-runner doctor
 agent-action-runner docs:generate
 ```
 
-Configuration is read from `agent-runner.config.json` by default.
+Most read commands support `--json` or `--format json`.
 
-Runner commands import compiled ESM JavaScript that exports `runner` or default exports an `AgentActionRunner` instance. `workflow:run` defaults to `read`, `draft`, and `dryRun`; use `--allow-mutate` only for intentional local/dev smoke-runs where the runner's approval hook is configured.
+## Example
 
-`actions:export --runner` can generate `.agent-runner/actions.json` from the registered actions in a local runner module. Serializable schemas are written as JSON Schema; non-serializable schemas are marked with `schemaNotSerializable`.
+See `examples/cli-basic` for a compiled runner module, a sample workflow, and MCP preview commands.
 
-Use `--format json` or `--json` for machine-readable output where supported.
+## License
 
-`@modelcontextprotocol/sdk` is a peer dependency for `mcp:serve`.
+Apache-2.0

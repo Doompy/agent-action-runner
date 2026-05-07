@@ -23,15 +23,15 @@ This repository starts with a framework-agnostic core package and first-party fr
 
 ## Packages
 
-```txt
-@agent-action-runner/core
-@agent-action-runner/nestjs
-@agent-action-runner/http
-@agent-action-runner/express
-@agent-action-runner/fastify
-@agent-action-runner/mcp
-@agent-action-runner/cli
-```
+| Package | Purpose |
+|---|---|
+| `@agent-action-runner/core` | Framework-agnostic action registry, JSON workflow runner, validation, policy, approval, audit, and workflow builder. |
+| `@agent-action-runner/nestjs` | NestJS `@AgentAction()` decorator, provider discovery, and shared runner injection. |
+| `@agent-action-runner/http` | Shared HTTP request handling, response shapes, and error mapping for adapter authors. |
+| `@agent-action-runner/express` | Express routes for listing actions and executing actions or workflows. |
+| `@agent-action-runner/fastify` | Fastify plugin for listing actions and executing actions or workflows. |
+| `@agent-action-runner/mcp` | MCP exporter that turns eligible registered actions into MCP tools. |
+| `@agent-action-runner/cli` | Local development CLI for manifests, workflow validation, runner smoke-runs, docs generation, and MCP previews. |
 
 ## Core Quickstart
 

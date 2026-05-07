@@ -2,9 +2,11 @@
 
 MCP exporter for Agent Action Runner.
 
-Use this package to expose registered Agent Action Runner actions as MCP tools while keeping the same schema validation, mode checks, approval hooks, and audit hooks from `@agent-action-runner/core`.
+Use this package to expose registered Agent Action Runner actions as MCP tools while keeping the same schema validation, mode checks, approval hooks, policy hooks, and audit hooks from `@agent-action-runner/core`.
 
 By default, only `read`, `draft`, and `dryRun` actions are exported. `mutate` actions require explicit opt-in and approval gating.
+
+Experimental / pre-1.0.
 
 ## Install
 
@@ -12,7 +14,9 @@ By default, only `read`, `draft`, and `dryRun` actions are exported. `mutate` ac
 npm install @agent-action-runner/core @agent-action-runner/mcp @modelcontextprotocol/sdk zod
 ```
 
-## Usage
+`@modelcontextprotocol/sdk` is a peer dependency. This package returns an MCP SDK `McpServer`; you choose the transport.
+
+## Quickstart
 
 ```ts
 import { createRunner } from '@agent-action-runner/core';
@@ -24,7 +28,11 @@ const runner = createRunner();
 runner.registerAction({
   name: 'math.double',
   mode: 'read',
+  description: 'Double a number.',
   inputSchema: z.object({
+    value: z.number(),
+  }),
+  outputSchema: z.object({
     value: z.number(),
   }),
   handler: (input) => ({
@@ -33,18 +41,93 @@ runner.registerAction({
 });
 
 const server = createMcpExporter(runner, {
-  getUserId: () => 'user_1',
+  getUserId: () => 'local_user',
 });
 ```
 
-Connect the returned MCP server to a transport using the official MCP TypeScript SDK.
+## Stdio Server
 
-## Safety Defaults
+```ts
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { createMcpExporter } from '@agent-action-runner/mcp';
 
-- Exports `read`, `draft`, and `dryRun` actions by default.
-- Does not export `mutate` actions unless `exposeMutations: true` is set.
-- Does not trust approval tokens or allowed modes from tool arguments.
-- Executes tools through the core runner, so policy, approval, audit, and schema validation still apply.
+const server = createMcpExporter(runner, {
+  getUserId: () => process.env.AGENT_RUNNER_USER_ID ?? 'local_user',
+});
+
+await server.connect(new StdioServerTransport());
+```
+
+Do not write normal logs to stdout in a stdio MCP server. stdout is reserved for the MCP transport.
+
+## Export Rules
+
+Default behavior:
+
+- exports `read`, `draft`, and `dryRun`
+- skips `mutate`
+- skips actions without an `inputSchema`
+- skips actions whose input schema cannot be represented as an object JSON Schema
+- sanitizes tool names by replacing unsupported characters with `_`
+- resolves name collisions with deterministic numeric suffixes
+
+Example:
+
+```txt
+delivery.searchJobs -> delivery_searchJobs
+delivery.dryRunRetry -> delivery_dryRunRetry
+```
+
+## Mutate Actions
+
+`mutate` actions are hidden by default. To export them, you must explicitly opt in.
+
+```ts
+const server = createMcpExporter(runner, {
+  exposeMutations: true,
+  allowedModes: ['read', 'draft', 'dryRun', 'mutate'],
+  getUserId: () => 'operator_1',
+  getApprovalToken: async (context) => readApprovalToken(context),
+  getApprovalContext: async (context) => readApprovalContext(context),
+});
+```
+
+Even when exported, mutate tools still run through the core runner. Approval hooks and policies still decide whether execution succeeds.
+
+## Server-Side Context
+
+The exporter does not trust user identity, allowed modes, approval token, approval context, or metadata from tool arguments.
+
+```ts
+createMcpExporter(runner, {
+  getUserId: async (context) => {
+    return context.authInfo?.extra?.userId?.toString() ?? 'local_user';
+  },
+  allowedModes: ['read', 'draft', 'dryRun'],
+  getMetadata: async () => ({
+    source: 'mcp',
+  }),
+});
+```
+
+If `getUserId` is omitted, the exporter tries metadata keys such as `agent-action-runner/userId` and `userId`. If no user id is available, tool execution returns an MCP tool error.
+
+## Tool Results
+
+Successful tool calls return both `structuredContent` and a JSON text fallback.
+
+```json
+{
+  "executionId": "exec_1",
+  "actionName": "math.double",
+  "mode": "read",
+  "output": {
+    "value": 4
+  }
+}
+```
+
+Runner errors become MCP tool results with `isError: true`. They do not crash the MCP server.
 
 ## Diagnostics
 
@@ -56,7 +139,7 @@ import { createMcpToolReport } from '@agent-action-runner/mcp';
 const report = createMcpToolReport(runner);
 ```
 
-The report includes exported tools and skipped actions. Skipped actions include one of these reasons:
+Skipped actions include one of these reasons:
 
 ```txt
 modeNotExposed
@@ -65,4 +148,43 @@ schemaMissing
 schemaNotSerializable
 ```
 
-`createMcpToolCatalog()` still returns only exported tools.
+Use `createMcpToolCatalog()` when you only want exported tools.
+
+```ts
+import { createMcpToolCatalog } from '@agent-action-runner/mcp';
+
+const catalog = createMcpToolCatalog(runner);
+```
+
+## Public API
+
+- `createMcpExporter(runner, options)`
+- `registerMcpTools(server, runner, options)`
+- `createMcpToolCatalog(runner, options)`
+- `createMcpToolReport(runner, options)`
+
+Key options:
+
+```ts
+type McpExporterOptions = {
+  serverName?: string;
+  serverVersion?: string;
+  exposeModes?: readonly ActionMode[];
+  exposeMutations?: boolean;
+  allowedModes?: readonly ActionMode[];
+  getUserId?: (context) => string | Promise<string>;
+  getApprovalToken?: (context) => string | undefined | Promise<string | undefined>;
+  getApprovalContext?: (context) => ApprovalContextOverrides | undefined | Promise<ApprovalContextOverrides | undefined>;
+  getMetadata?: (context) => Readonly<Record<string, unknown>> | undefined | Promise<Readonly<Record<string, unknown>> | undefined>;
+};
+```
+
+## Examples
+
+- `examples/mcp-stdio`
+- `examples/mcp-admin-ops`
+- `examples/cli-basic`
+
+## License
+
+Apache-2.0
