@@ -129,6 +129,10 @@ export type ActionExecutionEvent = {
 
 export type AuditHook = (event: ActionExecutionEvent) => Promise<void> | void;
 
+export type AuditStore = {
+  write(event: ActionExecutionEvent): Promise<void> | void;
+};
+
 export type AgentRunnerOptions = {
   readonly defaultAllowedModes?: readonly ActionMode[];
   readonly policy?: PolicyCheck;

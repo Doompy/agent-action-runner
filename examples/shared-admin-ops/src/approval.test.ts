@@ -4,7 +4,7 @@ import {
   createDisableUserApproval,
   verifyApprovalToken,
 } from './approval.js';
-import { createStableHash } from './hash.js';
+import { createStableHash } from '@agent-action-runner/core';
 
 describe('admin ops approval helpers', () => {
   it('accepts approval tokens bound to the matching approval context', () => {

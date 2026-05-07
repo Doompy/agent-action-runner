@@ -302,8 +302,14 @@ read -> dryRun -> approve -> mutate -> audit
 - [Express Admin Ops](./examples/express-admin-ops) shows the HTTP adapter wiring.
 - [NestJS Admin Ops](./examples/nestjs-admin-ops) shows NestJS DI and `@AgentAction()` discovery.
 - [Fastify Admin Ops](./examples/fastify-admin-ops) shows the Fastify plugin wiring.
+- [Persistent Admin Ops](./examples/persistent-admin-ops) shows the same flow with file-backed approval records and append-only audit JSONL.
+- [Delivery Ops](./examples/delivery-ops) shows the domain workflow for retrying failed delivery jobs through search, dry-run, approval, retry execution, and audit.
 
-All examples demonstrate `admin.searchUsers`, `admin.dryRunDisableUser`, and `admin.disableUser` with an HMAC-bound approval token and an in-memory audit trail.
+The adapter examples demonstrate `admin.searchUsers`, `admin.dryRunDisableUser`, and `admin.disableUser` with an HMAC-bound approval token and an in-memory audit trail.
+
+The persistent example uses the same actions with file-backed approval/audit storage. It stores only approval token hashes, binds approvals to `userId`, `actionName`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`, and persists `started`, `succeeded`, and `failed` audit events without storing the raw approval token.
+
+The delivery example also includes a CLI config, action manifest, generated-style action docs, and a JSON workflow for local workflow validation and read/dryRun smoke-runs.
 
 ## Mutate Approval Model
 

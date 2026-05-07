@@ -66,14 +66,20 @@ This project is focused on a safety boundary between agents and TypeScript backe
 
 ## v0.5.0
 
-- Add persistent audit examples.
-- Add approval token binding examples.
-- The first in-memory approval/audit examples were added in v0.2.1 and v0.2.2; v0.5.0 should focus on persistence and production integration patterns.
-- Start with examples before publishing Redis or Prisma integration packages.
+- Added a persistent admin ops example with file-backed approval records and append-only audit JSONL.
+- Added a delivery ops example for failed job retry workflows.
+- Added delivery ops CLI artifacts for manifest inspection, workflow validation, workflow smoke-runs, and MCP preview.
+- Added core helpers for stable input hashing and audit store wiring.
+- Kept Redis, Prisma, and production approval service packages out of scope until the example pattern is validated.
+
+## v0.6.0 Candidates
+
+- Persistent audit integration packages after demand is clearer, likely starting with Prisma or a generic SQL store.
+- Approval service examples with token rotation, single-use approval consumption, and operator review metadata.
+- Workflow DSL extensions: condition, retry, timeout, and parallel execution.
 
 ## Later
 
 - Next.js adapter, after demand is clearer.
-- Workflow DSL extensions: condition, retry, timeout, and parallel execution.
 - Read-only TypeScript analyzer experiments.
 - Sandboxed TypeScript runner only after the safety model is mature.

@@ -1,14 +1,17 @@
-import { createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
-import { createStableHash } from '@agent-action-runner/core';
-import type { ApprovalContext } from '@agent-action-runner/core';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import {
+  createStableHash,
+  type ApprovalContext,
+  type ApprovalCheckResult,
+} from '@agent-action-runner/core';
 
-const APPROVAL_SECRET = 'agent-action-runner-example-secret';
+const APPROVAL_SECRET = 'agent-action-runner-delivery-example-secret';
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
-export type DisableUserApprovalPayload = {
+export type RetryJobsApprovalPayload = {
   readonly approvalId: string;
   readonly userId: string;
-  readonly actionName: 'admin.disableUser';
+  readonly actionName: 'delivery.executeRetry';
   readonly mode: 'mutate';
   readonly inputHash: string;
   readonly resourceIds: readonly string[];
@@ -16,44 +19,44 @@ export type DisableUserApprovalPayload = {
   readonly expiresAt: string;
 };
 
-export type StoredApproval = DisableUserApprovalPayload & {
+export type StoredRetryJobsApproval = RetryJobsApprovalPayload & {
   readonly createdAt: string;
 };
 
-export function createApprovalStore(): Map<string, StoredApproval> {
+export function createApprovalStore(): Map<string, StoredRetryJobsApproval> {
   return new Map();
 }
 
-export function createDisableUserApproval(input: {
+export function createRetryJobsApproval(input: {
   readonly operatorUserId: string;
-  readonly targetUserId: string;
+  readonly jobIds: readonly string[];
   readonly reason: string;
   readonly dryRunHash: string;
-  readonly approvals: Map<string, StoredApproval>;
+  readonly approvals: Map<string, StoredRetryJobsApproval>;
   readonly now?: Date;
 }): {
   readonly approvalId: string;
   readonly approvalToken: string;
-  readonly approval: StoredApproval;
+  readonly approval: StoredRetryJobsApproval;
   readonly mutateInput: {
-    readonly userId: string;
+    readonly jobIds: readonly string[];
     readonly reason: string;
     readonly dryRunHash: string;
   };
 } {
   const now = input.now ?? new Date();
   const mutateInput = {
-    userId: input.targetUserId,
+    jobIds: input.jobIds,
     reason: input.reason,
     dryRunHash: input.dryRunHash,
   };
-  const payload: DisableUserApprovalPayload = {
+  const payload: RetryJobsApprovalPayload = {
     approvalId: randomUUID(),
     userId: input.operatorUserId,
-    actionName: 'admin.disableUser',
+    actionName: 'delivery.executeRetry',
     mode: 'mutate',
     inputHash: createStableHash(mutateInput),
-    resourceIds: [input.targetUserId],
+    resourceIds: input.jobIds,
     dryRunHash: input.dryRunHash,
     expiresAt: new Date(now.getTime() + TOKEN_TTL_MS).toISOString(),
   };
@@ -75,9 +78,9 @@ export function createDisableUserApproval(input: {
 export function verifyApprovalToken(input: {
   readonly token?: string;
   readonly approvalContext: ApprovalContext;
-  readonly approvals: ReadonlyMap<string, StoredApproval>;
+  readonly approvals: ReadonlyMap<string, StoredRetryJobsApproval>;
   readonly now?: Date;
-}): { readonly approved: true; readonly approvalId: string } | { readonly approved: false } {
+}): ApprovalCheckResult {
   if (!input.token) {
     return { approved: false };
   }
@@ -94,7 +97,7 @@ export function verifyApprovalToken(input: {
 
   const now = input.now ?? new Date();
   if (Date.parse(payload.expiresAt) <= now.getTime()) {
-    return { approved: false };
+    return { approved: false, reason: 'Approval token expired.' };
   }
 
   if (
@@ -103,9 +106,9 @@ export function verifyApprovalToken(input: {
     || payload.mode !== input.approvalContext.mode
     || payload.inputHash !== input.approvalContext.inputHash
     || payload.dryRunHash !== input.approvalContext.dryRunHash
-    || payload.resourceIds.join(',') !== input.approvalContext.resourceIds?.join(',')
+    || payload.resourceIds.join('\0') !== input.approvalContext.resourceIds?.join('\0')
   ) {
-    return { approved: false };
+    return { approved: false, reason: 'Approval token does not match this retry request.' };
   }
 
   return {
@@ -114,13 +117,13 @@ export function verifyApprovalToken(input: {
   };
 }
 
-function signApprovalPayload(payload: DisableUserApprovalPayload): string {
+function signApprovalPayload(payload: RetryJobsApprovalPayload): string {
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signature = createSignature(encodedPayload);
   return `${encodedPayload}.${signature}`;
 }
 
-function parseApprovalToken(token: string): DisableUserApprovalPayload | undefined {
+function parseApprovalToken(token: string): RetryJobsApprovalPayload | undefined {
   const [encodedPayload, signature] = token.split('.');
   if (!encodedPayload || !signature) {
     return undefined;
@@ -132,7 +135,7 @@ function parseApprovalToken(token: string): DisableUserApprovalPayload | undefin
   }
 
   try {
-    return JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8')) as DisableUserApprovalPayload;
+    return JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8')) as RetryJobsApprovalPayload;
   } catch {
     return undefined;
   }

@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.5.0] - 2026-05-07
+
+### Added
+
+- Exported `createStableHash()` from `@agent-action-runner/core` for approval services that need the same deterministic input hash as the runner.
+- Added `AuditStore` and `createAuditHook()` to `@agent-action-runner/core`.
+- Added `examples/persistent-admin-ops`, an Express operational example with file-backed approval records and append-only audit JSONL.
+- Added `examples/delivery-ops`, an operational delivery retry example covering search, dry-run, approval, mutate, and audit.
+- Added delivery ops CLI artifacts, including an action manifest, generated-style action docs, and a JSON workflow for `delivery.searchJobs -> delivery.dryRunRetry`.
+
+### Changed
+
+- Bumped all public packages to `0.5.0`.
+- Updated internal peer dependency ranges to `^0.5.0`.
+- Updated the shared admin ops example to use the core stable hash helper.
+
+### Notes
+
+- The persistent example stores approval token hashes, not raw approval tokens.
+- Redis, Prisma, and production approval service packages remain out of scope for this release.
+
 ## [0.4.6] - 2026-05-07
 
 ### Changed

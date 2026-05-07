@@ -2,9 +2,9 @@ import type {
   AgentActionRunner,
   AgentExecutionContext,
 } from '@agent-action-runner/core';
+import { createStableHash } from '@agent-action-runner/core';
 import { z } from 'zod';
 import type { AdminUser } from './data.js';
-import { createStableHash } from './hash.js';
 
 export const AdminUserSchema = z.object({
   id: z.string(),

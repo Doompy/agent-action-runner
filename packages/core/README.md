@@ -23,6 +23,8 @@ npm install @agent-action-runner/core zod
 - Server-controlled mode enforcement.
 - Policy, approval, and audit hooks.
 - Deterministic input hashing for approval checks.
+- Public stable hash helper for approval services.
+- Audit store helper for persistent audit adapters.
 - Restricted step output references.
 - Type-safe workflow authoring helpers.
 - Static workflow validation helpers.
@@ -304,6 +306,18 @@ type ApprovalContext = {
 
 Core does not issue or sign approval tokens. Applications should bind approval tokens to the approval context fields they care about, especially `userId`, `actionName`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`.
 
+Use `createStableHash()` when an approval service needs to calculate the same deterministic input hash as the runner:
+
+```ts
+import { createStableHash } from '@agent-action-runner/core';
+
+const inputHash = createStableHash({
+  userId: 'user_2',
+  reason: 'Repeated policy violations.',
+  dryRunHash: 'dry_run_hash',
+});
+```
+
 Inside a handler, call `ctx.requireApproval()` before performing a sensitive mutation when you want an explicit guard at the mutation point.
 
 ```ts
@@ -334,9 +348,11 @@ const runner = createRunner({
 The audit hook receives `started`, `succeeded`, and `failed` events.
 
 ```ts
-const runner = createRunner({
-  audit: async (event) => {
-    await auditStore.write({
+import { createAuditHook, createRunner, type AuditStore } from '@agent-action-runner/core';
+
+const auditStore: AuditStore = {
+  async write(event) {
+    await persistentAuditStore.append({
       executionId: event.executionId,
       workflowId: event.workflowId,
       stepId: event.stepId,
@@ -344,9 +360,13 @@ const runner = createRunner({
       actionName: event.actionName,
       mode: event.mode,
       status: event.status,
-      createdAt: event.createdAt,
+      createdAt: event.createdAt.toISOString(),
     });
   },
+};
+
+const runner = createRunner({
+  audit: createAuditHook(auditStore),
 });
 ```
 
@@ -378,15 +398,19 @@ Common exports:
 - `registerActionCatalog`
 - `defineWorkflow`
 - `validateWorkflowDefinition`
-- core types such as `ActionDefinition`, `WorkflowDefinition`, `ActionMode`, `AgentExecutionContext`, `ApprovalContext`
+- `createStableHash`
+- `createAuditHook`
+- core types such as `ActionDefinition`, `WorkflowDefinition`, `ActionMode`, `AgentExecutionContext`, `ApprovalContext`, `AuditStore`
 
 ## Examples
 
 - `examples/basic`
 - `examples/cli-basic`
+- `examples/delivery-ops`
 - `examples/express-admin-ops`
 - `examples/nestjs-admin-ops`
 - `examples/fastify-admin-ops`
+- `examples/persistent-admin-ops`
 
 ## License
 

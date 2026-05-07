@@ -1,0 +1,24 @@
+{
+  "workflowName": "retry-failed-delivery-jobs",
+  "steps": [
+    {
+      "id": "jobs",
+      "action": "delivery.searchJobs",
+      "input": {
+        "status": ["FAILED", "DLQ"],
+        "campaignId": "campaign_spring"
+      }
+    },
+    {
+      "id": "dryRun",
+      "action": "delivery.dryRunRetry",
+      "input": {
+        "jobIds": {
+          "$fromStep": "jobs",
+          "path": "/jobIds"
+        },
+        "reason": "Recover transient CMS failures."
+      }
+    }
+  ]
+}

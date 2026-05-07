@@ -15,6 +15,14 @@ export {
   validateWorkflowDefinition,
 } from './validation.js';
 
+export {
+  createAuditHook,
+} from './audit.js';
+
+export {
+  createStableHash,
+} from './hash.js';
+
 export type {
   ActionDefinition,
   ActionExecutionEvent,
@@ -25,9 +33,11 @@ export type {
   AgentExecutionContext,
   AgentRunnerOptions,
   ApprovalCheck,
+  ApprovalCheckResult,
   ApprovalContext,
   ApprovalContextOverrides,
   AuditHook,
+  AuditStore,
   ExecutableActionDefinition,
   JsonPointer,
   PolicyCheck,

@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "actions": [
+    {
+      "name": "delivery.searchJobs",
+      "mode": "read",
+      "description": "Search delivery jobs by status, campaign, and retryability.",
+      "approvalRequired": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["PENDING", "FAILED", "DLQ", "RETRY_QUEUED", "COMPLETED"]
+            }
+          },
+          "campaignId": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array"
+          },
+          "jobIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "delivery.dryRunRetry",
+      "mode": "dryRun",
+      "description": "Preview retry eligibility and impact for delivery jobs.",
+      "approvalRequired": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": ["jobIds", "reason"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "resourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "retryableJobIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blockedJobIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dryRunHash": {
+            "type": "string"
+          },
+          "impactSummary": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "delivery.executeRetry",
+      "mode": "mutate",
+      "description": "Queue approved retryable delivery jobs for retry.",
+      "approvalRequired": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "dryRunHash": {
+            "type": "string"
+          }
+        },
+        "required": ["jobIds", "reason", "dryRunHash"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "retriedJobIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skippedJobIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

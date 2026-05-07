@@ -55,4 +55,4 @@ export type {
 
 export {
   createStableHash,
-} from './hash.js';
+} from '@agent-action-runner/core';
