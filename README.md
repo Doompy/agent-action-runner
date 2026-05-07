@@ -9,7 +9,6 @@ Expose existing service logic as agent-callable actions with schema validation, 
 Experimental / pre-1.0. Public APIs may change while the action, workflow, and approval contracts settle.
 
 See [CHANGELOG.md](./CHANGELOG.md) for release notes.
-See [PUBLISHING.md](./PUBLISHING.md) for npm publish automation.
 
 This repository starts with a framework-agnostic core package and first-party framework adapters:
 
@@ -33,8 +32,6 @@ This repository starts with a framework-agnostic core package and first-party fr
 @agent-action-runner/mcp
 @agent-action-runner/cli
 ```
-
-Before publishing these packages, the `@agent-action-runner` npm organization/scope must exist and the publisher must have access to it.
 
 ## Core Quickstart
 
@@ -332,28 +329,6 @@ The approval hook receives:
 ```
 
 Core does not issue or sign approval tokens. Applications should bind approval tokens to the approval context fields they care about, especially `userId`, `actionName`, `mode`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`.
-
-## Publish Checklist
-
-This repository is configured for public scoped packages:
-
-```bash
-npm run build
-npm run typecheck
-npm test
-npm run pack:check
-```
-
-Actual publishing is intentionally manual:
-
-```bash
-npm publish --workspace @agent-action-runner/core --access public
-npm publish --workspace @agent-action-runner/nestjs --access public
-npm publish --workspace @agent-action-runner/http --access public
-npm publish --workspace @agent-action-runner/express --access public
-npm publish --workspace @agent-action-runner/fastify --access public
-npm publish --workspace @agent-action-runner/mcp --access public
-```
 
 ## License
 
