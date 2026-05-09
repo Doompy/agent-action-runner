@@ -39,6 +39,7 @@ export type WorkflowStep = {
   readonly id: string;
   readonly action: string;
   readonly input: WorkflowInputValue;
+  readonly idempotencyKey?: string;
   readonly allowedModes?: readonly ActionMode[];
   readonly approvalToken?: string;
   readonly approvalContext?: ApprovalContextOverrides;
@@ -68,6 +69,7 @@ export type AgentExecutionContext = {
   readonly userId: string;
   readonly actionName: string;
   readonly mode: ActionMode;
+  readonly idempotencyKey?: string;
   readonly approvalToken?: string;
   readonly approvalContext: ApprovalContext;
   readonly metadata: Readonly<Record<string, unknown>>;
@@ -153,6 +155,7 @@ export type ActionExecutionEvent = {
   readonly input: unknown;
   readonly output?: unknown;
   readonly outputSummary?: string;
+  readonly idempotencyKeyHash?: string;
   readonly approvalTokenHash?: string;
   readonly approvalId?: string;
   readonly status: 'started' | 'succeeded' | 'failed';
@@ -184,6 +187,7 @@ export type ActionExecutionInput = {
   readonly attempt?: number;
   readonly maxAttempts?: number;
   readonly timeoutMs?: number;
+  readonly idempotencyKey?: string;
   readonly allowedModes?: readonly ActionMode[];
   readonly approvalToken?: string;
   readonly approvalContext?: ApprovalContextOverrides;

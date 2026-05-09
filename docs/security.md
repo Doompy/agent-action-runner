@@ -30,6 +30,27 @@ validate input
 
 `timeoutMs` is not cancellation. It marks an attempt as failed from the runner's perspective, but the handler's underlying Node.js work may still complete. Avoid retrying non-idempotent mutations unless the service method is designed around an idempotency key, transaction, and single-use approval consume.
 
+Core passes `idempotencyKey` to the handler context when the application provides one. The runner does not generate, reserve, lock, persist, or replay idempotency keys. Treat the key as an application-level transaction input:
+
+```ts
+handler: async (input, ctx) => {
+  ctx.requireApproval();
+
+  return prisma.$transaction(async (tx) => {
+    await consumeApprovalOnce(tx, ctx.approvalContext);
+    await reserveIdempotencyKey(tx, {
+      key: ctx.idempotencyKey,
+      actionName: ctx.actionName,
+      userId: ctx.userId,
+    });
+
+    return retryJob(tx, input.jobId);
+  });
+}
+```
+
+Audit events include `idempotencyKeyHash` instead of the raw key. The hash is for correlation, not a lock or replay store.
+
 ## Approval Tokens
 
 Core audit events never include raw approval tokens. They include `approvalTokenHash` only as a redacted correlation fingerprint.
@@ -45,7 +66,7 @@ Approval services should own:
 
 ## Audit Data
 
-By default, `v0.6.2` keeps audit payload behavior compatible with earlier releases. For production, configure `auditDefaults` and action-level `auditPolicy` to minimize input, output, and error data.
+By default, audit payload behavior remains compatible with earlier releases. For production, configure `auditDefaults` and action-level `auditPolicy` to minimize input, output, and error data.
 
 See [Audit Redaction](./audit-redaction.md).
 

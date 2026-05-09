@@ -88,6 +88,7 @@ export class AgentActionRunner {
       userId: request.userId,
       actionName: action.name,
       mode: action.mode,
+      idempotencyKey: request.idempotencyKey,
       approvalToken: request.approvalToken,
       approvalContext,
       metadata: request.metadata ?? {},
@@ -214,6 +215,7 @@ export class AgentActionRunner {
             attempt,
             maxAttempts: retry.maxAttempts,
             timeoutMs: step.timeoutMs,
+            idempotencyKey: step.idempotencyKey,
             allowedModes,
             approvalToken: step.approvalToken,
             approvalContext: step.approvalContext,
@@ -385,6 +387,7 @@ function createAuditEvent(input: {
   status: ActionExecutionEvent['status'];
 }): ActionExecutionEvent {
   const approvalTokenHash = createApprovalTokenHash(input.context.approvalToken);
+  const idempotencyKeyHash = createIdempotencyKeyHash(input.context.idempotencyKey);
   const transformedPayload = transformAuditPayload({
     action: input.action,
     auditDefaults: input.auditDefaults,
@@ -408,12 +411,21 @@ function createAuditEvent(input: {
     ...(transformedPayload.outputSummary === undefined
       ? {}
       : { outputSummary: transformedPayload.outputSummary }),
+    ...(idempotencyKeyHash === undefined ? {} : { idempotencyKeyHash }),
     ...(approvalTokenHash === undefined ? {} : { approvalTokenHash }),
     approvalId: input.approvalId,
     status: input.status,
     ...(transformedPayload.error === undefined ? {} : { error: transformedPayload.error }),
     createdAt: new Date(),
   };
+}
+
+function createIdempotencyKeyHash(idempotencyKey: string | undefined): string | undefined {
+  if (!idempotencyKey) {
+    return undefined;
+  }
+
+  return createHash('sha256').update(idempotencyKey, 'utf8').digest('hex');
 }
 
 function createApprovalTokenHash(approvalToken: string | undefined): string | undefined {

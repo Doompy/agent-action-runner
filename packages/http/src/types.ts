@@ -15,6 +15,11 @@ export type AgentHttpAdapterOptions<Request = unknown> = {
   readonly getAllowedModes?: (request: Request) => MaybePromise<readonly ActionMode[] | undefined>;
   readonly getApprovalToken?: (request: Request) => MaybePromise<string | undefined>;
   readonly getApprovalContext?: (request: Request) => MaybePromise<ApprovalContextOverrides | undefined>;
+  readonly getIdempotencyKey?: (request: Request) => MaybePromise<string | undefined>;
+  readonly getWorkflowStepIdempotencyKey?: (
+    request: Request,
+    step: WorkflowDefinition['steps'][number],
+  ) => MaybePromise<string | undefined>;
   readonly getMetadata?: (request: Request) => MaybePromise<Readonly<Record<string, unknown>> | undefined>;
   readonly allowClientExecutionOptions?: boolean;
   readonly workflowLimits?: AgentHttpWorkflowLimits | false;
@@ -32,6 +37,10 @@ export type AgentHttpRequestContext = {
   readonly allowedModes?: readonly ActionMode[];
   readonly approvalToken?: string;
   readonly approvalContext?: ApprovalContextOverrides;
+  readonly idempotencyKey?: string;
+  readonly getWorkflowStepIdempotencyKey?: (
+    step: WorkflowDefinition['steps'][number],
+  ) => MaybePromise<string | undefined>;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly allowClientExecutionOptions?: boolean;
   readonly workflowLimits?: AgentHttpWorkflowLimits | false;
@@ -54,6 +63,7 @@ export type AgentHttpActionExecuteBody = {
   readonly allowedModes?: readonly ActionMode[];
   readonly approvalToken?: string;
   readonly approvalContext?: ApprovalContextOverrides;
+  readonly idempotencyKey?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
 };
 

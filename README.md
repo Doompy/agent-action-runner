@@ -27,6 +27,7 @@ This repository starts with a framework-agnostic core package and first-party fr
 - Restricted step output references
 - Action metadata for API reuse documentation and MCP descriptions
 - Workflow retry, timeout, and continue-on-error controls
+- Idempotency key propagation for retry-safe mutation handlers
 - NestJS `@AgentAction()` provider discovery
 - Express and Fastify HTTP adapters
 
@@ -144,9 +145,40 @@ const result = await runner.executeWorkflow({
 
 `timeoutMs` marks an attempt as failed; it does not cancel work that already started in Node.js. For `mutate` actions with retry, design the underlying service around idempotency keys, transactions, and single-use approval consumption.
 
+## Idempotency For Mutations
+
+`idempotencyKey` is passed to the handler context and is intended for your service or transaction layer. The runner does not generate keys, store keys, lock resources, or replay results because those rules are domain-specific.
+
+```ts
+await runner.executeAction({
+  userId: 'operator_1',
+  action: 'delivery.executeRetry',
+  input: { jobIds: ['job_1'] },
+  allowedModes: ['mutate'],
+  approvalToken,
+  approvalContext,
+  idempotencyKey: `retry:job_1:${dryRunHash}`,
+});
+
+runner.registerAction({
+  name: 'delivery.executeRetry',
+  mode: 'mutate',
+  approvalRequired: true,
+  handler: async (input, ctx) => {
+    ctx.requireApproval();
+    return deliveryService.retryWithIdempotency(input.jobIds, {
+      operatorId: ctx.userId,
+      idempotencyKey: ctx.idempotencyKey,
+    });
+  },
+});
+```
+
+Audit events never store the raw `idempotencyKey`; when present, they include `idempotencyKeyHash` as a redacted fingerprint for correlation.
+
 ## Audit Data Minimization
 
-By default, `v0.6.2` preserves the existing audit payload behavior for patch compatibility:
+By default, audit payload behavior remains compatible with earlier releases:
 
 ```ts
 createRunner({

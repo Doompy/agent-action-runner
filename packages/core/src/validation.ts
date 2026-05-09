@@ -15,6 +15,7 @@ export type WorkflowValidationIssueCode =
   | 'unknownAction'
   | 'invalidMode'
   | 'invalidStepReference'
+  | 'invalidIdempotencyKey'
   | 'invalidInputValue'
   | 'invalidTimeout'
   | 'invalidRetry'
@@ -126,6 +127,10 @@ export function validateWorkflowDefinition(
       validateAllowedModes(step.allowedModes, `${stepPath}/allowedModes`, stepId, issues);
     }
 
+    if ('idempotencyKey' in step) {
+      validateIdempotencyKey(step.idempotencyKey, `${stepPath}/idempotencyKey`, stepId, issues);
+    }
+
     if ('timeoutMs' in step) {
       validateTimeoutMs(step.timeoutMs, `${stepPath}/timeoutMs`, stepId, issues);
     }
@@ -195,6 +200,22 @@ function validateAllowedModes(
       });
     }
   });
+}
+
+function validateIdempotencyKey(
+  value: unknown,
+  path: string,
+  stepId: string | undefined,
+  issues: WorkflowValidationIssue[],
+): void {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    issues.push({
+      code: 'invalidIdempotencyKey',
+      message: 'idempotencyKey must be a non-empty string.',
+      path,
+      stepId,
+    });
+  }
 }
 
 function validateTimeoutMs(

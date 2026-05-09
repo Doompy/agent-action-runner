@@ -49,6 +49,7 @@ describe('workflow builder', () => {
       .step('dryRun', actions.dryRunRetry, ({ fromStep }) => ({
         jobIds: fromStep('jobs', '/jobIds'),
       }), {
+        idempotencyKey: 'retry:job_1:dry_run_hash',
         timeoutMs: 1000,
         retry: {
           maxAttempts: 2,
@@ -77,6 +78,7 @@ describe('workflow builder', () => {
               path: '/jobIds',
             },
           },
+          idempotencyKey: 'retry:job_1:dry_run_hash',
           timeoutMs: 1000,
           retry: {
             maxAttempts: 2,

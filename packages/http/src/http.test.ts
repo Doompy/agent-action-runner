@@ -190,6 +190,98 @@ describe('@agent-action-runner/http', () => {
     });
   });
 
+  it('uses server-resolved idempotency keys for direct action execution', async () => {
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'delivery.dryRunRetry',
+      mode: 'dryRun',
+      handler: (_input, context) => ({
+        idempotencyKey: context.idempotencyKey ?? null,
+      }),
+    });
+
+    const response = await executeHttpAction(
+      runner,
+      'delivery.dryRunRetry',
+      {
+        input: {},
+        idempotencyKey: 'client-key',
+      },
+      {
+        userId: 'user_1',
+        idempotencyKey: 'server-key',
+      },
+    );
+
+    expect(response.result).toMatchObject({
+      output: {
+        idempotencyKey: 'server-key',
+      },
+    });
+  });
+
+  it('ignores client-provided idempotency keys by default for direct action execution', async () => {
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'delivery.dryRunRetry',
+      mode: 'dryRun',
+      handler: (_input, context) => ({
+        idempotencyKey: context.idempotencyKey ?? null,
+      }),
+    });
+
+    const response = await executeHttpAction(
+      runner,
+      'delivery.dryRunRetry',
+      {
+        input: {},
+        idempotencyKey: 'client-key',
+      },
+      {
+        userId: 'user_1',
+      },
+    );
+
+    expect(response.result).toMatchObject({
+      output: {
+        idempotencyKey: null,
+      },
+    });
+  });
+
+  it('passes client idempotency keys only when client execution options are enabled', async () => {
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'delivery.dryRunRetry',
+      mode: 'dryRun',
+      handler: (_input, context) => ({
+        idempotencyKey: context.idempotencyKey ?? null,
+      }),
+    });
+
+    const response = await executeHttpAction(
+      runner,
+      'delivery.dryRunRetry',
+      {
+        input: {},
+        idempotencyKey: 'client-key',
+      },
+      {
+        userId: 'user_1',
+        allowClientExecutionOptions: true,
+      },
+    );
+
+    expect(response.result).toMatchObject({
+      output: {
+        idempotencyKey: 'client-key',
+      },
+    });
+  });
+
   it('strips workflow step execution options unless client options are enabled', async () => {
     const runner = createRunner({
       approval: ({ approvalToken }) => (
@@ -225,6 +317,128 @@ describe('@agent-action-runner/http', () => {
         userId: 'user_1',
       },
     )).rejects.toBeInstanceOf(WorkflowExecutionError);
+  });
+
+  it('strips client workflow step idempotency keys by default', async () => {
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'delivery.dryRunRetry',
+      mode: 'dryRun',
+      handler: (_input, context) => ({
+        idempotencyKey: context.idempotencyKey ?? null,
+      }),
+    });
+
+    const response = await executeHttpWorkflow(
+      runner,
+      {
+        workflow: {
+          workflowName: 'client-workflow',
+          steps: [
+            {
+              id: 'dryRun',
+              action: 'delivery.dryRunRetry',
+              input: {},
+              idempotencyKey: 'client-step-key',
+            },
+          ],
+        },
+      },
+      {
+        userId: 'user_1',
+      },
+    );
+
+    expect(response.result).toMatchObject({
+      outputByStep: {
+        dryRun: {
+          idempotencyKey: null,
+        },
+      },
+    });
+  });
+
+  it('applies server-derived workflow step idempotency keys', async () => {
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'delivery.dryRunRetry',
+      mode: 'dryRun',
+      handler: (_input, context) => ({
+        idempotencyKey: context.idempotencyKey ?? null,
+      }),
+    });
+
+    const response = await executeHttpWorkflow(
+      runner,
+      {
+        workflow: {
+          workflowName: 'server-workflow',
+          steps: [
+            {
+              id: 'dryRun',
+              action: 'delivery.dryRunRetry',
+              input: {},
+              idempotencyKey: 'client-step-key',
+            },
+          ],
+        },
+      },
+      {
+        userId: 'user_1',
+        getWorkflowStepIdempotencyKey: (step) => `server:${step.id}`,
+      },
+    );
+
+    expect(response.result).toMatchObject({
+      outputByStep: {
+        dryRun: {
+          idempotencyKey: 'server:dryRun',
+        },
+      },
+    });
+  });
+
+  it('preserves client workflow step idempotency keys only when client options are enabled', async () => {
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'delivery.dryRunRetry',
+      mode: 'dryRun',
+      handler: (_input, context) => ({
+        idempotencyKey: context.idempotencyKey ?? null,
+      }),
+    });
+
+    const response = await executeHttpWorkflow(
+      runner,
+      {
+        workflow: {
+          workflowName: 'trusted-workflow',
+          steps: [
+            {
+              id: 'dryRun',
+              action: 'delivery.dryRunRetry',
+              input: {},
+              idempotencyKey: 'client-step-key',
+            },
+          ],
+        },
+      },
+      {
+        userId: 'user_1',
+        allowClientExecutionOptions: true,
+      },
+    );
+
+    expect(response.result).toMatchObject({
+      outputByStep: {
+        dryRun: {
+          idempotencyKey: 'client-step-key',
+        },
+      },
+    });
   });
 
   it('maps invalid workflow definitions to workflow validation failures', async () => {

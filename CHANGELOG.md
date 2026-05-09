@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.7.0] - 2026-05-09
+
+### Added
+
+- Added first-class `idempotencyKey` propagation through core action execution context.
+- Added `WorkflowStep.idempotencyKey` and workflow builder support for emitting step-level idempotency keys.
+- Added `idempotencyKeyHash` to audit events so durable audit stores can correlate retries without storing raw keys.
+- Added HTTP adapter hooks for server-derived idempotency keys:
+  - `getIdempotencyKey(request)` for direct action execution.
+  - `getWorkflowStepIdempotencyKey(request, step)` for workflow step execution.
+- Added workflow validation issue code `invalidIdempotencyKey`.
+
+### Changed
+
+- Bumped all public packages to `0.7.0` and updated internal peer dependency ranges to `^0.7.0`.
+- Expanded API reuse, security, core, HTTP, and Prisma persistence docs with mutation idempotency guidance.
+- HTTP adapters continue to ignore client-provided execution options by default, including body and workflow-step `idempotencyKey` values.
+
+### Notes
+
+- Core does not generate, store, lock, consume, or replay idempotency keys. Applications own those behaviors in their service or transaction layer.
+- Raw `idempotencyKey` values are available only to handlers through `ctx.idempotencyKey`; audit events receive `idempotencyKeyHash`.
+- MCP idempotency hooks, Prisma packages, and NestJS + Prisma operational examples remain deferred.
+
 ## [0.6.3] - 2026-05-09
 
 ### Fixed

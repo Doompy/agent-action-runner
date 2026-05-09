@@ -102,12 +102,19 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Added release consistency tooling to reduce version, changelog, lockfile, and internal peer range drift.
 - Improved README/API reuse positioning around avoiding repeated MCP, HTTP, workflow, docs, and test wrappers.
 
-## v0.7.0 Candidates
+## v0.7.0
 
-- First-class `idempotencyKey` propagation through action execution context.
-- Approval single-use consumption, audit append, execution attempt tracking, and idempotency key examples.
-- Prisma or generic SQL production pattern documentation before adding a package.
-- Consider a NestJS + Prisma operational example before extracting a persistence package.
+- Added first-class `idempotencyKey` propagation through action execution context.
+- Added workflow step idempotency keys and builder support.
+- Added audit `idempotencyKeyHash` fingerprints without storing raw keys.
+- Added HTTP server-side idempotency key resolvers for direct actions and workflow steps.
+- Expanded Prisma production pattern documentation for approval single-use consume, idempotency reserve/replay, audit append, and retry race conditions.
+- Kept MCP idempotency hooks, Prisma packages, and NestJS + Prisma operational examples out of scope until the production pattern is validated.
+
+## v0.7.x Candidates
+
+- Add MCP idempotency key resolver hooks if tool-call retry behavior needs first-class support.
+- Consider a NestJS + Prisma operational example after the Prisma guide is stable.
 - Optional package extraction later: `@agent-action-runner/prisma` or `@agent-action-runner/sql-audit` after demand is clearer.
 - Workflow DSL extensions after reliability basics are validated: condition, parallel execution, and rollback hooks.
 

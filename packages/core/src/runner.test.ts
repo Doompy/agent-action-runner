@@ -342,6 +342,71 @@ describe('AgentActionRunner', () => {
     expect(events[3]).toEqual(expect.objectContaining({ error: expect.any(Error) }));
   });
 
+  it('passes idempotency keys to handlers and only emits audit hashes', async () => {
+    const contexts: unknown[] = [];
+    const events: Array<Record<string, unknown>> = [];
+    const runner = createRunner({
+      audit: (event) => {
+        events.push(event as unknown as Record<string, unknown>);
+      },
+    });
+
+    runner.registerAction({
+      name: 'delivery.executeRetry',
+      mode: 'dryRun',
+      handler: (_input, context) => {
+        contexts.push({
+          idempotencyKey: context.idempotencyKey,
+        });
+        return { ok: true };
+      },
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'delivery.executeRetry',
+      input: {},
+      idempotencyKey: 'retry:job_1:dry_run_hash',
+    });
+
+    expect(contexts).toEqual([
+      {
+        idempotencyKey: 'retry:job_1:dry_run_hash',
+      },
+    ]);
+    expect(JSON.stringify(events)).not.toContain('retry:job_1:dry_run_hash');
+    expect(events.map((event) => event.idempotencyKeyHash)).toEqual([
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+      expect.stringMatching(/^[a-f0-9]{64}$/),
+    ]);
+  });
+
+  it('does not emit idempotency key hashes when no key is supplied', async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const runner = createRunner({
+      audit: (event) => {
+        events.push(event as unknown as Record<string, unknown>);
+      },
+    });
+
+    runner.registerAction({
+      name: 'delivery.searchJobs',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'delivery.searchJobs',
+      input: {},
+    });
+
+    expect(events).toHaveLength(2);
+    for (const event of events) {
+      expect(Object.prototype.hasOwnProperty.call(event, 'idempotencyKeyHash')).toBe(false);
+    }
+  });
+
   it('keeps audit input, output, and error payloads full by default', async () => {
     const events: Array<Record<string, unknown>> = [];
     const expectedError = new Error('full failure');
@@ -653,6 +718,45 @@ describe('AgentActionRunner', () => {
       attempts: 2,
       output: { ok: true, attempts: 2 },
     });
+  });
+
+  it('passes workflow step idempotency keys to action contexts', async () => {
+    const contexts: unknown[] = [];
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'delivery.executeRetry',
+      mode: 'dryRun',
+      handler: (_input, context) => {
+        contexts.push({
+          idempotencyKey: context.idempotencyKey,
+          stepId: context.stepId,
+        });
+        return { ok: true };
+      },
+    });
+
+    await runner.executeWorkflow({
+      userId: 'user_1',
+      workflow: {
+        workflowName: 'retry-with-idempotency',
+        steps: [
+          {
+            id: 'retry',
+            action: 'delivery.executeRetry',
+            input: {},
+            idempotencyKey: 'retry:job_1:dry_run_hash',
+          },
+        ],
+      },
+    });
+
+    expect(contexts).toEqual([
+      {
+        idempotencyKey: 'retry:job_1:dry_run_hash',
+        stepId: 'retry',
+      },
+    ]);
   });
 
   it('fails workflows when retry attempts are exhausted', async () => {

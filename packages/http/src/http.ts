@@ -26,6 +26,7 @@ import type {
   AgentHttpSuccessResponse,
   AgentHttpWorkflowLimits,
   AgentHttpWorkflowExecuteBody,
+  MaybePromise,
 } from './types.js';
 
 const DEFAULT_WORKFLOW_LIMITS: Required<AgentHttpWorkflowLimits> = {
@@ -44,6 +45,10 @@ export async function resolveAgentHttpRequestContext<Request>(
     allowedModes: await options.getAllowedModes?.(request),
     approvalToken: await options.getApprovalToken?.(request),
     approvalContext: await options.getApprovalContext?.(request),
+    idempotencyKey: await options.getIdempotencyKey?.(request),
+    getWorkflowStepIdempotencyKey: options.getWorkflowStepIdempotencyKey === undefined
+      ? undefined
+      : (step) => options.getWorkflowStepIdempotencyKey?.(request, step),
     metadata: await options.getMetadata?.(request),
     allowClientExecutionOptions: options.allowClientExecutionOptions,
     workflowLimits: options.workflowLimits,
@@ -96,10 +101,11 @@ export async function executeHttpWorkflow(
 ): Promise<AgentHttpSuccessResponse> {
   const normalizedBody = toWorkflowBody(body);
   const executionOptions = resolveExecutionOptions(normalizedBody, context);
-  const workflow = resolveWorkflowForExecution(
+  const workflow = await resolveWorkflowForExecution(
     normalizedBody.workflow,
     executionOptions,
     Boolean(context.allowClientExecutionOptions),
+    context.getWorkflowStepIdempotencyKey,
   );
   assertWorkflowWithinLimits(workflow, context.workflowLimits);
 
@@ -201,6 +207,7 @@ function resolveExecutionOptions(
   readonly allowedModes?: readonly ActionMode[];
   readonly approvalToken?: string;
   readonly approvalContext?: ApprovalContextOverrides;
+  readonly idempotencyKey?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
 } {
   const allowClientOptions = Boolean(context.allowClientExecutionOptions);
@@ -209,8 +216,19 @@ function resolveExecutionOptions(
     allowedModes: context.allowedModes ?? (allowClientOptions ? body.allowedModes : undefined),
     approvalToken: context.approvalToken ?? (allowClientOptions ? body.approvalToken : undefined),
     approvalContext: context.approvalContext ?? (allowClientOptions ? body.approvalContext : undefined),
+    idempotencyKey: context.idempotencyKey ?? (allowClientOptions ? getBodyIdempotencyKey(body) : undefined),
     metadata: context.metadata ?? (allowClientOptions ? body.metadata : undefined),
   };
+}
+
+function getBodyIdempotencyKey(body: AgentHttpActionExecuteBody | AgentHttpWorkflowExecuteBody): string | undefined {
+  if (!isRecord(body)) {
+    return undefined;
+  }
+
+  const record = body as Record<string, unknown>;
+  const idempotencyKey = record.idempotencyKey;
+  return typeof idempotencyKey === 'string' ? idempotencyKey : undefined;
 }
 
 function toActionBody(body: unknown): AgentHttpActionExecuteBody {
@@ -236,19 +254,23 @@ function resolveWorkflowForExecution(
     readonly approvalContext?: ApprovalContextOverrides;
   },
   allowClientExecutionOptions: boolean,
-): WorkflowDefinition {
+  getWorkflowStepIdempotencyKey:
+    | ((step: WorkflowStep) => MaybePromise<string | undefined>)
+    | undefined,
+): Promise<WorkflowDefinition> | WorkflowDefinition {
   if (!Array.isArray((workflow as { readonly steps?: unknown }).steps)) {
     return workflow;
   }
 
-  return {
+  return Promise.all(workflow.steps.map((step) => resolveWorkflowStepForExecution(
+    step,
+    executionOptions,
+    allowClientExecutionOptions,
+    getWorkflowStepIdempotencyKey,
+  ))).then((steps) => ({
     ...workflow,
-    steps: workflow.steps.map((step) => resolveWorkflowStepForExecution(
-      step,
-      executionOptions,
-      allowClientExecutionOptions,
-    )),
-  };
+    steps,
+  }));
 }
 
 function assertWorkflowWithinLimits(
@@ -326,7 +348,10 @@ function resolveWorkflowStepForExecution(
     readonly approvalContext?: ApprovalContextOverrides;
   },
   allowClientExecutionOptions: boolean,
-): WorkflowStep {
+  getWorkflowStepIdempotencyKey:
+    | ((step: WorkflowStep) => MaybePromise<string | undefined>)
+    | undefined,
+): Promise<WorkflowStep> {
   const resolvedStep: WorkflowStep = {
     id: step.id,
     action: step.action,
@@ -336,21 +361,28 @@ function resolveWorkflowStepForExecution(
     ...(step.continueOnError === undefined ? {} : { continueOnError: step.continueOnError }),
   };
 
-  if (allowClientExecutionOptions) {
+  return Promise.resolve(getWorkflowStepIdempotencyKey?.(step)).then((serverIdempotencyKey) => {
+    const idempotencyKey = serverIdempotencyKey
+      ?? (allowClientExecutionOptions ? step.idempotencyKey : undefined);
+
+    if (allowClientExecutionOptions) {
+      return {
+        ...resolvedStep,
+        ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+        ...(step.allowedModes === undefined ? {} : { allowedModes: step.allowedModes }),
+        ...resolveOptionalExecutionOptions({
+          approvalToken: executionOptions.approvalToken ?? step.approvalToken,
+          approvalContext: executionOptions.approvalContext ?? step.approvalContext,
+        }),
+      };
+    }
+
     return {
       ...resolvedStep,
-      ...(step.allowedModes === undefined ? {} : { allowedModes: step.allowedModes }),
-      ...resolveOptionalExecutionOptions({
-        approvalToken: executionOptions.approvalToken ?? step.approvalToken,
-        approvalContext: executionOptions.approvalContext ?? step.approvalContext,
-      }),
+      ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+      ...resolveOptionalExecutionOptions(executionOptions),
     };
-  }
-
-  return {
-    ...resolvedStep,
-    ...resolveOptionalExecutionOptions(executionOptions),
-  };
+  });
 }
 
 function resolveOptionalExecutionOptions(

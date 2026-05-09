@@ -33,6 +33,7 @@ npm install @agent-action-runner/core zod
 - Static workflow validation helpers.
 - Action metadata for API reuse documentation.
 - Workflow retry, timeout, and continue-on-error controls.
+- Idempotency key propagation for retry-safe mutation handlers.
 
 ## Quickstart
 
@@ -146,7 +147,7 @@ runner.registerAction({
 });
 ```
 
-Action names must be unique. Handlers receive parsed input and an execution context with user id, action name, mode, workflow id, step id, metadata, approval token, and approval context.
+Action names must be unique. Handlers receive parsed input and an execution context with user id, action name, mode, workflow id, step id, metadata, approval token, approval context, and optional idempotency key.
 
 ## Executing One Action
 
@@ -174,6 +175,22 @@ await runner.executeAction({
 });
 ```
 
+Use `idempotencyKey` for `mutate` actions that may be retried or may time out from the runner's perspective while the underlying work continues:
+
+```ts
+await runner.executeAction({
+  userId: 'operator_1',
+  action: 'delivery.executeRetry',
+  input: { jobIds: ['job_1'] },
+  allowedModes: ['mutate'],
+  approvalToken,
+  approvalContext,
+  idempotencyKey: `retry:job_1:${dryRunHash}`,
+});
+```
+
+The raw key is available to the handler as `ctx.idempotencyKey`. Audit events only receive `idempotencyKeyHash`, a SHA-256 fingerprint for correlation. Core does not generate keys, reserve keys, lock rows, or replay results; applications own that behavior in their service or transaction layer.
+
 ## Executing Workflows
 
 Workflows are plain JSON data. They execute sequentially, and each step can reference outputs from earlier steps.
@@ -189,6 +206,7 @@ Workflows are plain JSON data. They execute sequentially, and each step can refe
         "status": ["FAILED"]
       },
       "timeoutMs": 1000,
+      "idempotencyKey": "search-failed:2026-05-06",
       "retry": {
         "maxAttempts": 2,
         "delayMs": 50
@@ -216,7 +234,7 @@ fromStep('jobs', '/jobIds');
 
 Paths are JSON Pointer strings. References can only resolve against previous step outputs.
 
-`retry.maxAttempts` includes the first attempt. `timeoutMs` marks the attempt as failed after the configured duration; it does not cancel underlying Node.js work that has already started. Use `continueOnError: true` only when downstream steps can safely consume a failed step result.
+`retry.maxAttempts` includes the first attempt. `timeoutMs` marks the attempt as failed after the configured duration; it does not cancel underlying Node.js work that has already started. `idempotencyKey` must be a non-empty string when present and is passed to the step's action context. Use `continueOnError: true` only when downstream steps can safely consume a failed step result.
 
 For `mutate` actions, retries should only be enabled when the underlying service is idempotent or protected by a transaction/idempotency key. A timeout can happen while the original work is still running.
 
@@ -294,6 +312,7 @@ Validation catches:
 - unknown actions when an action catalog is supplied
 - invalid action modes
 - invalid retry, timeout, or continue-on-error controls
+- invalid idempotency keys
 - references to missing or future steps
 - unsupported input values
 
@@ -375,7 +394,7 @@ The audit hook receives `started`, `succeeded`, and `failed` events.
 
 Workflow retries add `attempt` and `maxAttempts` to audit events.
 
-Audit events do not include the raw `approvalToken`. When a token is present, the event includes `approvalTokenHash` instead.
+Audit events do not include the raw `approvalToken` or raw `idempotencyKey`. When present, the event includes `approvalTokenHash` and `idempotencyKeyHash` instead.
 
 `approvalTokenHash` is a redacted fingerprint for audit correlation, not a secure approval token store. Approval services should use secret-backed HMACs or sufficiently random approval tokens for verification.
 
@@ -425,7 +444,7 @@ runner.registerAction({
 });
 ```
 
-`redactPaths` uses exact JSON Pointer paths, such as `/password`, `/profile/email`, or `/items/0/token`. Missing paths are ignored. Wildcards, globs, and regex paths are not supported in `v0.6.2`.
+`redactPaths` uses exact JSON Pointer paths, such as `/password`, `/profile/email`, or `/items/0/token`. Missing paths are ignored. Wildcards, globs, and regex paths are not currently supported.
 
 Payload modes:
 

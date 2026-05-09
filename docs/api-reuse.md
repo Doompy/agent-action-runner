@@ -110,6 +110,16 @@ Workflow steps can define local reliability controls:
 
 Avoid retrying non-idempotent mutations unless the service method is designed for it. A production mutation should usually combine an idempotency key, approval single-use consumption, the business side effect, and audit append in the same transaction boundary.
 
+Good idempotency keys are domain-specific. Do not rely on the runner to invent them:
+
+```txt
+retry:${jobId}:${dryRunHash}
+disable-user:${targetUserId}:${approvalId}
+refund:${paymentId}:${approvalId}
+```
+
+The raw key is available to handlers as `ctx.idempotencyKey` so application services can reserve it, return a previous result, or reject conflicting in-progress work. Audit events store only `idempotencyKeyHash`.
+
 Use `continueOnError: true` only when a failed step is expected and downstream steps can safely consume the failure result.
 
 ## Exposure Options

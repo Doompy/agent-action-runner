@@ -121,6 +121,7 @@ describe('validateWorkflowDefinition', () => {
           id: 'jobs',
           action: 'delivery.searchJobs',
           input: {},
+          idempotencyKey: 'retry:job_1:dry_run_hash',
           timeoutMs: 1000,
           retry: {
             maxAttempts: 3,
@@ -160,6 +161,37 @@ describe('validateWorkflowDefinition', () => {
       'invalidRetry',
       'invalidRetry',
       'invalidContinueOnError',
+    ]);
+  });
+
+  it('reports invalid idempotency key values', () => {
+    const result = validateWorkflowDefinition({
+      workflowName: 'bad-idempotency',
+      steps: [
+        {
+          id: 'empty',
+          action: 'delivery.searchJobs',
+          input: {},
+          idempotencyKey: '',
+        },
+        {
+          id: 'wrong-type',
+          action: 'delivery.searchJobs',
+          input: {},
+          idempotencyKey: 123,
+        },
+      ],
+    }, { actions });
+
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        code: 'invalidIdempotencyKey',
+        path: '/steps/0/idempotencyKey',
+      }),
+      expect.objectContaining({
+        code: 'invalidIdempotencyKey',
+        path: '/steps/1/idempotencyKey',
+      }),
     ]);
   });
 });

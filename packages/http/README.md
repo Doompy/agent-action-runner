@@ -49,7 +49,8 @@ Action execute request bodies use:
 {
   "input": {
     "status": ["FAILED"]
-  }
+  },
+  "idempotencyKey": "optional-client-key-for-trusted-endpoints"
 }
 ```
 
@@ -75,6 +76,8 @@ type AgentHttpAdapterOptions<Request> = {
   getAllowedModes?: (request: Request) => readonly ActionMode[] | undefined | Promise<readonly ActionMode[] | undefined>;
   getApprovalToken?: (request: Request) => string | undefined | Promise<string | undefined>;
   getApprovalContext?: (request: Request) => ApprovalContextOverrides | undefined | Promise<ApprovalContextOverrides | undefined>;
+  getIdempotencyKey?: (request: Request) => string | undefined | Promise<string | undefined>;
+  getWorkflowStepIdempotencyKey?: (request: Request, step: WorkflowStep) => string | undefined | Promise<string | undefined>;
   getMetadata?: (request: Request) => Readonly<Record<string, unknown>> | undefined | Promise<Readonly<Record<string, unknown>> | undefined>;
   allowClientExecutionOptions?: boolean;
   workflowLimits?: false | {
@@ -86,7 +89,9 @@ type AgentHttpAdapterOptions<Request> = {
 };
 ```
 
-By default, client-supplied `allowedModes`, `approvalToken`, `approvalContext`, and `metadata` are ignored. They are passed through only when `allowClientExecutionOptions: true` is set.
+By default, client-supplied `allowedModes`, `approvalToken`, `approvalContext`, `idempotencyKey`, workflow step `idempotencyKey`, and `metadata` are ignored. They are passed through only when `allowClientExecutionOptions: true` is set.
+
+For direct action execution, `getIdempotencyKey(req)` takes precedence over body `idempotencyKey`. For workflow execution, `getWorkflowStepIdempotencyKey(req, step)` can provide a server-derived key per step. The helper never auto-generates keys because useful idempotency keys are domain-specific.
 
 Workflow endpoints also apply safety caps before execution. Defaults are `maxSteps: 50`, `maxStepTimeoutMs: 30000`, `maxRetryAttempts: 3`, and `maxRetryDelayMs: 5000`. Set `workflowLimits: false` only for trusted/internal endpoints that intentionally disable these caps. Configure request payload byte limits in your host framework body parser, such as Express `express.json({ limit })` or Fastify body limit options.
 
