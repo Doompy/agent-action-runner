@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type {
@@ -18,6 +19,8 @@ const DEFAULT_CONFIG_FILE = 'agent-runner.config.json';
 const DEFAULT_ALLOWED_MODES: readonly ActionMode[] = ['read', 'draft', 'dryRun'];
 const ACTION_MODES: readonly ActionMode[] = ['read', 'draft', 'dryRun', 'mutate'];
 const ACTION_RISK_LEVELS: readonly ActionRiskLevel[] = ['low', 'medium', 'high'];
+const require = createRequire(import.meta.url);
+const CLI_PACKAGE_VERSION = readPackageVersion();
 
 export type CliOptions = {
   readonly argv: readonly string[];
@@ -133,6 +136,15 @@ export async function runCli(options: CliOptions): Promise<number> {
       case 'actions:export':
         await runActionsExport(context, parseArgs(rest));
         return 0;
+      case 'actions:openapi':
+        await runActionsOpenApi(context, parseArgs(rest));
+        return 0;
+      case 'workflow:explain':
+        await runWorkflowExplain(context, parseArgs(rest));
+        return 0;
+      case 'workflow:graph':
+        await runWorkflowGraph(context, parseArgs(rest));
+        return 0;
       case 'workflow:validate':
         return await runWorkflowValidate(context, parseArgs(rest));
       case 'workflow:run':
@@ -246,6 +258,80 @@ async function runActionsExport(context: CommandContext, args: ParsedArgs): Prom
 
   await writeJsonFile(out, manifest);
   context.stdout(`Exported ${manifest.actions.length} actions to ${path.relative(context.cwd, out)}\n`);
+}
+
+async function runActionsOpenApi(context: CommandContext, args: ParsedArgs): Promise<void> {
+  const config = await loadConfig(context, args);
+  const runner = await loadRunner(context, args, config);
+  const manifest = await createManifestFromRunner(runner);
+  const document = createOpenApiDocument(manifest);
+  const out = args.options.out ? resolvePath(context.cwd, args.options.out) : undefined;
+
+  if (out) {
+    await writeJsonFile(out, document);
+    context.stdout(`Generated ${path.relative(context.cwd, out)}\n`);
+    return;
+  }
+
+  writeJson(context, document);
+}
+
+async function runWorkflowExplain(context: CommandContext, args: ParsedArgs): Promise<void> {
+  const workflowFile = args.positionals[0];
+  if (!workflowFile) {
+    throw new CliError('workflow:explain requires a workflow JSON file.');
+  }
+
+  const config = await loadConfig(context, args);
+  const manifest = await loadActionManifestSource(context, args, config);
+  const workflow = await readJsonFile(resolvePath(context.cwd, workflowFile));
+  const explanation = createWorkflowExplanation(workflow, manifest);
+
+  if (wantsJson(args)) {
+    writeJson(context, explanation);
+    return;
+  }
+
+  context.stdout(`Workflow: ${explanation.workflowName}\n\n`);
+  for (const step of explanation.steps) {
+    const controls = [
+      step.timeoutMs ? `timeout=${step.timeoutMs}ms` : undefined,
+      step.retry ? `retry=${step.retry.maxAttempts}` : undefined,
+      step.continueOnError ? 'continueOnError' : undefined,
+      step.hasIdempotencyKey ? 'idempotencyKey' : undefined,
+    ].filter(Boolean).join(', ');
+    context.stdout(`- ${step.id}: ${step.action}${step.mode ? ` (${step.mode})` : ''}${controls ? ` [${controls}]` : ''}\n`);
+    if (step.dependsOn.length > 0) {
+      context.stdout(`  depends on: ${step.dependsOn.join(', ')}\n`);
+    }
+  }
+}
+
+async function runWorkflowGraph(context: CommandContext, args: ParsedArgs): Promise<void> {
+  const workflowFile = args.positionals[0];
+  if (!workflowFile) {
+    throw new CliError('workflow:graph requires a workflow JSON file.');
+  }
+  const format = args.options.format ?? 'mermaid';
+  if (format !== 'mermaid') {
+    throw new CliError('workflow:graph currently supports only --format mermaid.');
+  }
+
+  const config = await loadConfig(context, args);
+  const manifest = await loadActionManifestSource(context, args, config);
+  const workflow = await readJsonFile(resolvePath(context.cwd, workflowFile));
+  const explanation = createWorkflowExplanation(workflow, manifest);
+  const mermaid = createMermaidGraph(explanation);
+
+  if (args.options.out) {
+    const out = resolvePath(context.cwd, args.options.out);
+    await mkdir(path.dirname(out), { recursive: true });
+    await writeFile(out, mermaid, 'utf8');
+    context.stdout(`Generated ${path.relative(context.cwd, out)}\n`);
+    return;
+  }
+
+  context.stdout(mermaid);
 }
 
 async function runWorkflowValidate(context: CommandContext, args: ParsedArgs): Promise<number> {
@@ -581,6 +667,183 @@ function createActionsMarkdown(manifest: ActionManifest): string {
     )),
     '',
   ].join('\n');
+}
+
+function createOpenApiDocument(manifest: ActionManifest): Record<string, unknown> {
+  const paths: Record<string, unknown> = {};
+
+  for (const action of manifest.actions) {
+    if (action.inputSchemaStatus !== 'present' || action.inputSchema === undefined) {
+      continue;
+    }
+
+    const operationId = sanitizeOperationId(action.name);
+    paths[`/actions/${operationId}/execute`] = {
+      post: {
+        operationId,
+        summary: action.description ?? action.name,
+        tags: action.tags,
+        'x-agent-action-runner-action-name': action.name,
+        'x-agent-action-runner-mode': action.mode,
+        'x-agent-action-runner-approval-required': isApprovalRequired(action),
+        'x-agent-action-runner-resource-type': action.resourceType,
+        'x-agent-action-runner-risk-level': action.riskLevel,
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  input: action.inputSchema,
+                },
+                required: ['input'],
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Action execution result.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  additionalProperties: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  return {
+    openapi: '3.1.0',
+    info: {
+      title: 'Agent Action Runner Actions',
+      version: CLI_PACKAGE_VERSION,
+    },
+    paths,
+  };
+}
+
+type WorkflowExplanation = {
+  readonly workflowName: string;
+  readonly steps: readonly WorkflowStepExplanation[];
+};
+
+type WorkflowStepExplanation = {
+  readonly id: string;
+  readonly action: string;
+  readonly mode?: ActionMode;
+  readonly timeoutMs?: number;
+  readonly retry?: {
+    readonly maxAttempts: number;
+    readonly delayMs?: number;
+  };
+  readonly continueOnError?: boolean;
+  readonly hasIdempotencyKey: boolean;
+  readonly dependsOn: readonly string[];
+};
+
+function createWorkflowExplanation(
+  workflow: unknown,
+  manifest: ActionManifest,
+): WorkflowExplanation {
+  if (!isRecord(workflow)) {
+    throw new CliError('Workflow must be a JSON object.');
+  }
+  if (typeof workflow.workflowName !== 'string') {
+    throw new CliError('Workflow is missing workflowName.');
+  }
+  if (!Array.isArray(workflow.steps)) {
+    throw new CliError('Workflow steps must be an array.');
+  }
+
+  const actions = new Map(manifest.actions.map((action) => [action.name, action]));
+  return {
+    workflowName: workflow.workflowName,
+    steps: workflow.steps.map((step, index): WorkflowStepExplanation => {
+      if (!isRecord(step)) {
+        throw new CliError(`Workflow step at index ${index} must be an object.`);
+      }
+      const id = typeof step.id === 'string' ? step.id : `step_${index + 1}`;
+      const actionName = typeof step.action === 'string' ? step.action : '';
+      const retry = isRecord(step.retry) && typeof step.retry.maxAttempts === 'number'
+        ? {
+          maxAttempts: step.retry.maxAttempts,
+          delayMs: typeof step.retry.delayMs === 'number' ? step.retry.delayMs : undefined,
+        }
+        : undefined;
+
+      return {
+        id,
+        action: actionName,
+        mode: actions.get(actionName)?.mode,
+        timeoutMs: typeof step.timeoutMs === 'number' ? step.timeoutMs : undefined,
+        retry,
+        continueOnError: typeof step.continueOnError === 'boolean' ? step.continueOnError : undefined,
+        hasIdempotencyKey: typeof step.idempotencyKey === 'string' && step.idempotencyKey.length > 0,
+        dependsOn: findStepReferences(step.input),
+      };
+    }),
+  };
+}
+
+function createMermaidGraph(explanation: WorkflowExplanation): string {
+  const lines = ['flowchart TD'];
+  for (const step of explanation.steps) {
+    lines.push(`  ${toMermaidNodeId(step.id)}["${escapeMermaidLabel(createMermaidNodeLabel(step))}"]`);
+  }
+  for (const step of explanation.steps) {
+    for (const dependency of step.dependsOn) {
+      lines.push(`  ${toMermaidNodeId(dependency)} --> ${toMermaidNodeId(step.id)}`);
+    }
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+function findStepReferences(value: unknown): readonly string[] {
+  const references = new Set<string>();
+  collectStepReferences(value, references);
+  return [...references];
+}
+
+function collectStepReferences(value: unknown, references: Set<string>): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStepReferences(item, references);
+    }
+    return;
+  }
+  if (!isRecord(value)) {
+    return;
+  }
+  if (typeof value.$fromStep === 'string') {
+    references.add(value.$fromStep);
+  }
+  for (const item of Object.values(value)) {
+    collectStepReferences(item, references);
+  }
+}
+
+function createMermaidNodeLabel(step: WorkflowStepExplanation): string {
+  return `${step.id}\\n${step.action}${step.mode ? `/${step.mode}` : ''}`;
+}
+
+function toMermaidNodeId(value: string): string {
+  return `step_${value.replace(/[^A-Za-z0-9_]/g, '_') || 'unknown'}`;
+}
+
+function escapeMermaidLabel(value: string): string {
+  return value.replace(/"/g, '\\"');
+}
+
+function sanitizeOperationId(actionName: string): string {
+  return actionName.replace(/[^A-Za-z0-9_-]/g, '_').replace(/^_+|_+$/g, '') || 'action';
 }
 
 async function loadActionManifestSource(
@@ -1101,6 +1364,9 @@ function writeHelp(context: CommandContext): void {
     '  actions:list',
     '  actions:inspect <actionName>',
     '  actions:export --runner <file>',
+    '  actions:openapi --runner <file> [--out <file>]',
+    '  workflow:explain <file> [--runner <file>]',
+    '  workflow:graph <file> [--format mermaid] [--out <file>]',
     '  workflow:validate <file> [--runner <file>]',
     '  workflow:run <file>',
     '  mcp:preview',
@@ -1122,6 +1388,15 @@ function formatCliError(error: unknown): string {
   }
 
   return error.message;
+}
+
+function readPackageVersion(): string {
+  try {
+    const manifest = require('../package.json') as { readonly version?: unknown };
+    return typeof manifest.version === 'string' ? manifest.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

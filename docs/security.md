@@ -28,7 +28,7 @@ validate input
   -> audit append
 ```
 
-`timeoutMs` is not cancellation. It marks an attempt as failed from the runner's perspective, but the handler's underlying Node.js work may still complete. Avoid retrying non-idempotent mutations unless the service method is designed around an idempotency key, transaction, and single-use approval consume.
+`timeoutMs` is not forced cancellation. It marks an attempt as failed from the runner's perspective and aborts `ctx.signal`, but the handler's underlying Node.js work may still complete unless the handler passes that signal into cancellable APIs. Avoid retrying non-idempotent mutations unless the service method is designed around an idempotency key, transaction, and single-use approval consume.
 
 Core passes `idempotencyKey` to the handler context when the application provides one. The runner does not generate, reserve, lock, persist, or replay idempotency keys. Treat the key as an application-level transaction input:
 

@@ -1,7 +1,7 @@
 {
-  "name": "@agent-action-runner/mcp",
+  "name": "@agent-action-runner/opentelemetry",
   "version": "0.8.0",
-  "description": "MCP exporter for Agent Action Runner.",
+  "description": "OpenTelemetry instrumentation for Agent Action Runner.",
   "license": "Apache-2.0",
   "author": "Doompy",
   "type": "module",
@@ -20,7 +20,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Doompy/agent-action-runner.git",
-    "directory": "packages/mcp"
+    "directory": "packages/opentelemetry"
   },
   "homepage": "https://github.com/Doompy/agent-action-runner#readme",
   "bugs": {
@@ -33,15 +33,10 @@
     "workflow",
     "agent-workflow",
     "tool-calling",
-    "mcp",
-    "approval",
+    "observability",
+    "opentelemetry",
     "audit",
-    "dry-run",
-    "human-in-the-loop",
-    "zod",
-    "nestjs",
-    "express",
-    "fastify"
+    "dry-run"
   ],
   "engines": {
     "node": ">=18.18.0"
@@ -61,12 +56,11 @@
   },
   "peerDependencies": {
     "@agent-action-runner/core": "^0.8.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "zod": "^4.0.0"
+    "@opentelemetry/api": "^1.9.0"
   },
   "devDependencies": {
     "@agent-action-runner/core": "file:../core",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@opentelemetry/api": "^1.9.0",
     "vitest": "^4.0.14",
     "zod": "^4.1.13"
   }

@@ -281,36 +281,62 @@ describe('@agent-action-runner/mcp', () => {
 
   it('passes server-derived idempotency keys to action handlers', async () => {
     const runner = createRunner();
+    const actionContexts: unknown[] = [];
+    const rawInputs: unknown[] = [];
     runner.registerAction({
       name: 'delivery.dryRunRetry',
       mode: 'dryRun',
-      inputSchema: z.object({ jobId: z.string() }),
-      handler: (_input, context) => ({
+      tags: ['delivery'],
+      resourceType: 'deliveryJob',
+      riskLevel: 'medium',
+      inputSchema: z.object({ jobId: z.coerce.string() }),
+      handler: (input, context) => ({
         idempotencyKey: context.idempotencyKey ?? null,
+        parsedJobIdType: typeof input.jobId,
       }),
     });
 
     const server = new McpServer({ name: 'test', version: '0.0.0' });
     registerMcpTools(server, runner, {
       getUserId: () => 'user_1',
-      getIdempotencyKey: (_context, action, input) => (
-        action.name === 'delivery.dryRunRetry' && isRecord(input)
-          ? `dry-run:${input.jobId}`
-          : undefined
-      ),
+      getIdempotencyKey: (_context, action, input) => {
+        actionContexts.push(action);
+        rawInputs.push(input);
+        return action.name === 'delivery.dryRunRetry' && isRecord(input)
+          ? `dry-run:${String(input.jobId)}`
+          : undefined;
+      },
     });
 
     const result = await callRegisteredTool(server, 'delivery_dryRunRetry', {
-      jobId: 'job_1',
+      jobId: 1,
       idempotencyKey: 'client-key',
     });
 
     expect(result.isError).toBe(false);
     expect(result.structuredContent).toMatchObject({
       output: {
-        idempotencyKey: 'dry-run:job_1',
+        idempotencyKey: 'dry-run:1',
+        parsedJobIdType: 'string',
       },
     });
+    expect(actionContexts).toEqual([
+      {
+        name: 'delivery.dryRunRetry',
+        mode: 'dryRun',
+        tags: ['delivery'],
+        resourceType: 'deliveryJob',
+        riskLevel: 'medium',
+        deprecated: undefined,
+      },
+    ]);
+    expect(actionContexts[0]).not.toHaveProperty('handler');
+    expect(rawInputs).toEqual([
+      {
+        jobId: 1,
+        idempotencyKey: 'client-key',
+      },
+    ]);
   });
 });
 

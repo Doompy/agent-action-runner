@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.8.0] - 2026-05-10
+
+### Added
+
+- Added cooperative `AbortSignal` support to action execution contexts. `timeoutMs` now aborts `ctx.signal` while still failing with `ActionTimeoutError`.
+- Added small core policy helpers: `composePolicies()`, `allowModes()`, `requireRole()`, and `requireScope()`.
+- Added `@agent-action-runner/testing` with a framework-neutral runner harness, approval/policy helpers, and audit event helpers.
+- Added `@agent-action-runner/opentelemetry` with wrapper-based action/workflow spans and metrics.
+- Added CLI `actions:openapi`, `workflow:explain`, and `workflow:graph`.
+
+### Changed
+
+- Bumped all public packages to `0.8.0` and updated internal peer dependency ranges to `^0.8.0`.
+- Narrowed MCP `getIdempotencyKey` action argument to a metadata-only `McpIdempotencyActionContext`.
+- Documented that MCP `getIdempotencyKey` receives raw tool arguments before core schema parsing/defaulting/coercion/transforms.
+- Updated MCP idempotency examples to derive mutation keys from server-verified approval context instead of trusting raw input fields.
+- Adjusted workflow validation so invalid `allowedModes` values do not also emit duplicate `modeNotAllowedForStep` issues.
+
+### Notes
+
+- Cancellation remains cooperative. Handlers must pass `ctx.signal` into cancellable database, HTTP, queue, or SDK calls.
+- OpenAPI export is intended for documentation, QA, and security review; it does not create an auth boundary.
+- TypeScript Runner, visual builder, persistence packages, and arbitrary code execution remain out of scope.
+
 ## [0.7.1] - 2026-05-09
 
 ### Fixed

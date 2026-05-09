@@ -25,9 +25,12 @@ Use server-side resolvers for:
 - allowed modes
 - approval token
 - approval context
+- idempotency key
 - request metadata
 
 Do not accept these values from model-controlled tool input.
+
+`getIdempotencyKey(context, action, input)` receives raw MCP tool arguments before core schema parsing, defaults, coercion, or transforms. For mutations, prefer deriving idempotency keys from server-verified approval context, sessions, or stored dry-run records instead of trusting raw tool input fields.
 
 ## Mutation Tools
 

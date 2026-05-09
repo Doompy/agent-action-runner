@@ -122,16 +122,18 @@ If `getUserId` is omitted, the exporter tries metadata keys such as `agent-actio
 
 For retry-sensitive tools, derive idempotency keys on the server side. Client-supplied tool arguments are still treated as action input, not trusted execution options.
 
+`getIdempotencyKey(context, action, input)` receives raw MCP tool arguments before core input schema parsing, defaulting, coercion, or transforms. If the key depends on normalized input, derive it from a server-side approval context, session, or dry-run store, or reproduce the same normalization explicitly.
+
 ```ts
 createMcpExporter(runner, {
   getUserId: () => 'operator_1',
-  getIdempotencyKey: async (_context, action, input) => {
-    if (action.name === 'delivery.executeRetry' && typeof input === 'object' && input !== null) {
-      const jobId = (input as { jobId?: unknown }).jobId;
-      const dryRunHash = (input as { dryRunHash?: unknown }).dryRunHash;
-      return typeof jobId === 'string' && typeof dryRunHash === 'string'
-        ? `retry:${jobId}:${dryRunHash}`
-        : undefined;
+  getApprovalContext: async (context) => {
+    return readApprovalContextFromSessionOrStore(context);
+  },
+  getIdempotencyKey: async (context, action) => {
+    if (action.name === 'delivery.executeRetry') {
+      const approvalContext = await readApprovalContextFromSessionOrStore(context);
+      return `retry:${approvalContext.resourceIds?.join(',')}:${approvalContext.dryRunHash}`;
     }
 
     return undefined;
@@ -202,10 +204,12 @@ type McpExporterOptions = {
   getUserId?: (context) => string | Promise<string>;
   getApprovalToken?: (context) => string | undefined | Promise<string | undefined>;
   getApprovalContext?: (context) => ApprovalContextOverrides | undefined | Promise<ApprovalContextOverrides | undefined>;
-  getIdempotencyKey?: (context, action, input) => string | undefined | Promise<string | undefined>;
+  getIdempotencyKey?: (context, action: McpIdempotencyActionContext, rawInput) => string | undefined | Promise<string | undefined>;
   getMetadata?: (context) => Readonly<Record<string, unknown>> | undefined | Promise<Readonly<Record<string, unknown>> | undefined>;
 };
 ```
+
+`McpIdempotencyActionContext` contains public action metadata only: `name`, `mode`, `tags`, `resourceType`, `riskLevel`, and `deprecated`.
 
 ## Examples
 

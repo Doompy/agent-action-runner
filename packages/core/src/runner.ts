@@ -80,6 +80,7 @@ export class AgentActionRunner {
       input,
       request,
     });
+    const abortController = createExecutionAbortController(request.signal);
     let approved = false;
     const context: AgentExecutionContext = {
       executionId,
@@ -88,6 +89,7 @@ export class AgentActionRunner {
       userId: request.userId,
       actionName: action.name,
       mode: action.mode,
+      signal: abortController.signal,
       idempotencyKey: request.idempotencyKey,
       approvalToken: request.approvalToken,
       approvalContext,
@@ -137,6 +139,7 @@ export class AgentActionRunner {
         Promise.resolve(action.handler(input, context)),
         request.timeoutMs,
         action.name,
+        abortController,
       );
       const output = parseWithSchema(action, 'output', rawOutput);
 
@@ -283,6 +286,7 @@ async function withTimeout<Output>(
   promise: Promise<Output>,
   timeoutMs: number | undefined,
   actionName: string,
+  abortController: AbortController,
 ): Promise<Output> {
   if (timeoutMs === undefined) {
     return promise;
@@ -290,7 +294,9 @@ async function withTimeout<Output>(
 
   return new Promise<Output>((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new ActionTimeoutError(actionName, timeoutMs));
+      const error = new ActionTimeoutError(actionName, timeoutMs);
+      abortController.abort(error);
+      reject(error);
     }, timeoutMs);
 
     promise.then(
@@ -304,6 +310,24 @@ async function withTimeout<Output>(
       },
     );
   });
+}
+
+function createExecutionAbortController(signal: AbortSignal | undefined): AbortController {
+  const abortController = new AbortController();
+  if (!signal) {
+    return abortController;
+  }
+
+  if (signal.aborted) {
+    abortController.abort(signal.reason);
+    return abortController;
+  }
+
+  signal.addEventListener('abort', () => {
+    abortController.abort(signal.reason);
+  }, { once: true });
+
+  return abortController;
 }
 
 function normalizeRetry(retry: WorkflowStepRetry | undefined): Required<WorkflowStepRetry> {

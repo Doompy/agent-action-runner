@@ -206,8 +206,10 @@ function validateAllowedModes(
   }
 
   const modes: ActionMode[] = [];
+  let valid = true;
   value.forEach((mode, index) => {
     if (typeof mode !== 'string' || !ACTION_MODES.includes(mode as ActionMode)) {
+      valid = false;
       issues.push({
         code: 'invalidMode',
         message: `allowedModes contains invalid mode "${String(mode)}".`,
@@ -220,7 +222,7 @@ function validateAllowedModes(
     modes.push(mode as ActionMode);
   });
 
-  return modes;
+  return valid ? modes : undefined;
 }
 
 function validateIdempotencyKey(

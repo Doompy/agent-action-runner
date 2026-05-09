@@ -106,7 +106,7 @@ Workflow steps can define local reliability controls:
 }
 ```
 
-`timeoutMs` marks an action attempt as failed after the configured duration. It does not cancel underlying Node.js work that has already started.
+`timeoutMs` marks an action attempt as failed after the configured duration and aborts `ctx.signal`. It does not forcibly cancel underlying Node.js work that has already started. Pass `ctx.signal` into cancellable service clients when they support it.
 
 Avoid retrying non-idempotent mutations unless the service method is designed for it. A production mutation should usually combine an idempotency key, approval single-use consumption, the business side effect, and audit append in the same transaction boundary.
 
@@ -129,6 +129,8 @@ Use `continueOnError: true` only when a failed step is expected and downstream s
 - CLI validates and smoke-runs workflows locally.
 
 All three reuse the same registered action boundary.
+
+The CLI can also export OpenAPI documentation and explain or graph workflow JSON for security review and QA. These outputs describe the action boundary; they do not replace application authentication or authorization.
 
 ## What This Is Not
 

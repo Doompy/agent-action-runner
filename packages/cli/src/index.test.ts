@@ -293,6 +293,66 @@ describe('@agent-action-runner/cli runner module commands', () => {
     ]));
   });
 
+  it('exports OpenAPI from a real runner', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+    const out = path.join(cwd, 'agent-actions.openapi.json');
+
+    const result = await runTestCli(cwd, ['actions:openapi', '--runner', runnerPath, '--out', out]);
+
+    expect(result.exitCode).toBe(0);
+    const document = JSON.parse(await readFile(out, 'utf8'));
+    expect(document.openapi).toBe('3.1.0');
+    expect(document.paths['/actions/math_double/execute'].post).toMatchObject({
+      operationId: 'math_double',
+      'x-agent-action-runner-action-name': 'math.double',
+      'x-agent-action-runner-mode': 'read',
+    });
+    expect(document.paths['/actions/danger_rawMutation/execute']).toBeUndefined();
+  });
+
+  it('explains workflows and generates Mermaid graphs', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+    const workflowPath = await writeWorkflow(cwd, 'explain.workflow.json', {
+      workflowName: 'explain',
+      steps: [
+        {
+          id: 'jobs',
+          action: 'delivery.searchJobs',
+          input: { status: ['FAILED'] },
+        },
+        {
+          id: 'retry',
+          action: 'delivery.executeRetry',
+          input: {
+            jobIds: { $fromStep: 'jobs', path: '/jobIds' },
+          },
+          timeoutMs: 1000,
+          retry: {
+            maxAttempts: 2,
+          },
+          continueOnError: true,
+          idempotencyKey: 'retry:job_1',
+        },
+      ],
+    });
+
+    const explain = await runTestCli(cwd, ['workflow:explain', workflowPath, '--runner', runnerPath, '--json']);
+    expect(explain.exitCode).toBe(0);
+    expect(JSON.parse(explain.stdout).steps[1]).toMatchObject({
+      id: 'retry',
+      mode: 'mutate',
+      dependsOn: ['jobs'],
+      hasIdempotencyKey: true,
+    });
+
+    const graph = await runTestCli(cwd, ['workflow:graph', workflowPath, '--runner', runnerPath]);
+    expect(graph.exitCode).toBe(0);
+    expect(graph.stdout).toContain('flowchart TD');
+    expect(graph.stdout).toContain('step_jobs --> step_retry');
+  });
+
   it('generates docs and doctor warnings from a real runner', async () => {
     const cwd = await createTempDir();
     const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });

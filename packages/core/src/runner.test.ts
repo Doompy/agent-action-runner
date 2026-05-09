@@ -4,11 +4,16 @@ import {
   ActionTimeoutError,
   ApprovalRequiredError,
   ModeNotAllowedError,
+  PolicyRejectedError,
   SchemaValidationError,
   WorkflowExecutionError,
   WorkflowValidationError,
+  allowModes,
+  composePolicies,
   createRunner,
   fromStep,
+  requireRole,
+  requireScope,
 } from './index.js';
 
 describe('AgentActionRunner', () => {
@@ -379,6 +384,118 @@ describe('AgentActionRunner', () => {
       expect.stringMatching(/^[a-f0-9]{64}$/),
       expect.stringMatching(/^[a-f0-9]{64}$/),
     ]);
+  });
+
+  it('passes an abort signal to action handlers', async () => {
+    const signals: AbortSignal[] = [];
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'signal.read',
+      mode: 'read',
+      handler: (_input, context) => {
+        signals.push(context.signal);
+        return { aborted: context.signal.aborted };
+      },
+    });
+
+    const result = await runner.executeAction({
+      userId: 'user_1',
+      action: 'signal.read',
+      input: {},
+    });
+
+    expect(result.output).toEqual({ aborted: false });
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+  });
+
+  it('connects external abort signals to the handler context', async () => {
+    const abortController = new AbortController();
+    let signal: AbortSignal | undefined;
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'signal.external',
+      mode: 'read',
+      handler: (_input, context) => {
+        signal = context.signal;
+        abortController.abort();
+        return { aborted: context.signal.aborted };
+      },
+    });
+
+    const result = await runner.executeAction({
+      userId: 'user_1',
+      action: 'signal.external',
+      input: {},
+      signal: abortController.signal,
+    });
+
+    expect(result.output).toEqual({ aborted: true });
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('aborts the handler context signal when an action times out', async () => {
+    let signal: AbortSignal | undefined;
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'signal.timeout',
+      mode: 'read',
+      handler: async (_input, context) => {
+        signal = context.signal;
+        await new Promise((resolve) => {
+          setTimeout(resolve, 20);
+        });
+        return { ok: true };
+      },
+    });
+
+    await expect(runner.executeAction({
+      userId: 'user_1',
+      action: 'signal.timeout',
+      input: {},
+      timeoutMs: 1,
+    })).rejects.toBeInstanceOf(ActionTimeoutError);
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('supports small policy composition helpers', async () => {
+    const runner = createRunner({
+      policy: composePolicies(
+        allowModes(['read']),
+        requireRole('admin'),
+        requireScope('delivery:read', { actions: ['delivery.searchJobs'] }),
+      ),
+    });
+
+    runner.registerAction({
+      name: 'delivery.searchJobs',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+
+    await expect(runner.executeAction({
+      userId: 'user_1',
+      action: 'delivery.searchJobs',
+      input: {},
+      metadata: {
+        roles: ['operator'],
+        scopes: ['delivery:read'],
+      },
+    })).rejects.toBeInstanceOf(PolicyRejectedError);
+
+    await expect(runner.executeAction({
+      userId: 'user_1',
+      action: 'delivery.searchJobs',
+      input: {},
+      metadata: {
+        roles: 'admin',
+        scopes: ['delivery:read'],
+      },
+    })).resolves.toMatchObject({
+      output: { ok: true },
+    });
   });
 
   it('does not emit idempotency key hashes when no key is supplied', async () => {

@@ -23,6 +23,13 @@ export {
   createStableHash,
 } from './hash.js';
 
+export {
+  allowModes,
+  composePolicies,
+  requireRole,
+  requireScope,
+} from './policy.js';
+
 export type {
   ActionDefinition,
   ActionExample,
@@ -57,6 +64,10 @@ export type {
   WorkflowStepResult,
   WorkflowStepSucceededResult,
 } from './types.js';
+
+export type {
+  PolicyRequirementOptions,
+} from './policy.js';
 
 export type {
   ActionCatalog,

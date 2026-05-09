@@ -27,6 +27,15 @@ export type MaybePromise<T> = T | Promise<T>;
 
 export type McpToolRequestContext = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
+export type McpIdempotencyActionContext = {
+  readonly name: string;
+  readonly mode: ActionMode;
+  readonly tags?: readonly string[];
+  readonly resourceType?: string;
+  readonly riskLevel?: ActionRiskLevel;
+  readonly deprecated?: boolean | string;
+};
+
 export type McpExporterOptions = {
   readonly serverName?: string;
   readonly serverVersion?: string;
@@ -38,7 +47,7 @@ export type McpExporterOptions = {
   readonly getApprovalContext?: (context: McpToolRequestContext) => MaybePromise<ApprovalContextOverrides | undefined>;
   readonly getIdempotencyKey?: (
     context: McpToolRequestContext,
-    action: ExecutableActionDefinition,
+    action: McpIdempotencyActionContext,
     input: unknown,
   ) => MaybePromise<string | undefined>;
   readonly getMetadata?: (context: McpToolRequestContext) => MaybePromise<Readonly<Record<string, unknown>> | undefined>;
@@ -203,7 +212,11 @@ async function executeMcpTool(
       allowedModes: resolveAllowedModes(options),
       approvalToken: await options.getApprovalToken?.(context),
       approvalContext: await options.getApprovalContext?.(context),
-      idempotencyKey: await options.getIdempotencyKey?.(context, action, input),
+      idempotencyKey: await options.getIdempotencyKey?.(
+        context,
+        createMcpIdempotencyActionContext(action),
+        input,
+      ),
       metadata: await options.getMetadata?.(context),
     });
     const structuredContent = {
@@ -329,6 +342,19 @@ function createActionMetadata(action: ExecutableActionDefinition): {
     riskLevel: action.riskLevel,
     deprecated: action.deprecated,
     examples: action.examples,
+  };
+}
+
+function createMcpIdempotencyActionContext(
+  action: ExecutableActionDefinition,
+): McpIdempotencyActionContext {
+  return {
+    name: action.name,
+    mode: action.mode,
+    tags: action.tags,
+    resourceType: action.resourceType,
+    riskLevel: action.riskLevel,
+    deprecated: action.deprecated,
   };
 }
 

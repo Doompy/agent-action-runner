@@ -47,6 +47,8 @@ npm view @agent-action-runner/fastify version
 npm view @agent-action-runner/nestjs version
 npm view @agent-action-runner/mcp version
 npm view @agent-action-runner/cli version
+npm view @agent-action-runner/opentelemetry version
+npm view @agent-action-runner/testing version
 ```
 
 ## Tag And Release Notes

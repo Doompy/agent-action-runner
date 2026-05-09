@@ -34,6 +34,8 @@ npm install @agent-action-runner/core zod
 - Action metadata for API reuse documentation.
 - Workflow retry, timeout, and continue-on-error controls.
 - Idempotency key propagation for retry-safe mutation handlers.
+- Cooperative `AbortSignal` for cancellable handlers.
+- Small policy composition helpers.
 
 ## Quickstart
 
@@ -147,7 +149,7 @@ runner.registerAction({
 });
 ```
 
-Action names must be unique. Handlers receive parsed input and an execution context with user id, action name, mode, workflow id, step id, metadata, approval token, approval context, and optional idempotency key.
+Action names must be unique. Handlers receive parsed input and an execution context with user id, action name, mode, workflow id, step id, metadata, approval token, approval context, cooperative `AbortSignal`, and optional idempotency key.
 
 ## Executing One Action
 
@@ -190,6 +192,24 @@ await runner.executeAction({
 ```
 
 The raw key is available to the handler as `ctx.idempotencyKey`. Audit events only receive `idempotencyKeyHash`, a SHA-256 fingerprint for correlation. Core does not generate keys, reserve keys, lock rows, or replay results; applications own that behavior in their service or transaction layer.
+
+## Cooperative Cancellation
+
+Handlers receive `ctx.signal`, an `AbortSignal` for cooperative cancellation.
+
+```ts
+runner.registerAction({
+  name: 'delivery.searchJobs',
+  mode: 'read',
+  handler: async (input, ctx) => {
+    return deliveryService.searchJobs(input, {
+      signal: ctx.signal,
+    });
+  },
+});
+```
+
+When `timeoutMs` expires, the runner rejects the attempt with `ActionTimeoutError` and aborts `ctx.signal`. This does not forcibly stop work already running in Node.js. Cancellation only happens if your handler passes the signal to APIs that honor it.
 
 ## Executing Workflows
 
@@ -391,6 +411,27 @@ const runner = createRunner({
 });
 ```
 
+Small policy helpers are available when role/scope checks can be read from `context.metadata`.
+
+```ts
+import {
+  allowModes,
+  composePolicies,
+  requireRole,
+  requireScope,
+} from '@agent-action-runner/core';
+
+const runner = createRunner({
+  policy: composePolicies(
+    allowModes(['read', 'draft', 'dryRun']),
+    requireRole('admin', { actions: ['admin.disableUser'] }),
+    requireScope('delivery:write', { actions: ['delivery.executeRetry'] }),
+  ),
+});
+```
+
+`requireRole()` reads `metadata.roles` by default and `requireScope()` reads `metadata.scopes` by default. Both accept either a string or string array, and both support `metadataKey` when your application uses different metadata fields.
+
 ## Audit Hook
 
 The audit hook receives `started`, `succeeded`, and `failed` events.
@@ -518,6 +559,10 @@ Common exports:
 - `validateWorkflowDefinition`
 - `createStableHash`
 - `createAuditHook`
+- `composePolicies`
+- `allowModes`
+- `requireRole`
+- `requireScope`
 - core types such as `ActionDefinition`, `ActionExample`, `ActionRiskLevel`, `AuditPayloadPolicy`, `AuditPayloadMode`, `WorkflowDefinition`, `ActionMode`, `AgentExecutionContext`, `ApprovalContext`, `AuditStore`
 
 ## Examples

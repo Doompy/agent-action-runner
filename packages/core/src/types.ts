@@ -69,6 +69,7 @@ export type AgentExecutionContext = {
   readonly userId: string;
   readonly actionName: string;
   readonly mode: ActionMode;
+  readonly signal: AbortSignal;
   readonly idempotencyKey?: string;
   readonly approvalToken?: string;
   readonly approvalContext: ApprovalContext;
@@ -183,6 +184,7 @@ export type ActionExecutionInput = {
   readonly userId: string;
   readonly action: string;
   readonly input: unknown;
+  readonly signal?: AbortSignal;
   readonly executionId?: string;
   readonly attempt?: number;
   readonly maxAttempts?: number;

@@ -136,6 +136,22 @@ describe('validateWorkflowDefinition', () => {
     ]);
   });
 
+  it('does not add mode mismatch issues when allowedModes contains invalid values', () => {
+    const result = validateWorkflowDefinition({
+      workflowName: 'invalid-mode-only',
+      steps: [
+        {
+          id: 'dryRun',
+          action: 'delivery.dryRunRetry',
+          allowedModes: ['invalid'],
+          input: {},
+        },
+      ],
+    }, { actions });
+
+    expect(result.issues.map((issue) => issue.code)).toEqual(['invalidMode']);
+  });
+
   it('accepts retry, timeout, and continueOnError step controls', () => {
     const result = validateWorkflowDefinition({
       workflowName: 'reliable-workflow',

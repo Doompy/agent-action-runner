@@ -27,9 +27,13 @@ This repository starts with a framework-agnostic core package and first-party fr
 - Restricted step output references
 - Action metadata for API reuse documentation and MCP descriptions
 - Workflow retry, timeout, and continue-on-error controls
+- Cooperative `AbortSignal` for cancellable handlers
 - Idempotency key propagation for retry-safe mutation handlers
+- Small policy composition helpers
 - NestJS `@AgentAction()` provider discovery
 - Express and Fastify HTTP adapters
+- OpenTelemetry runner instrumentation
+- Framework-neutral testing helpers
 
 ## Packages
 
@@ -42,6 +46,8 @@ This repository starts with a framework-agnostic core package and first-party fr
 | `@agent-action-runner/fastify` | Fastify plugin for listing actions and executing actions or workflows. |
 | `@agent-action-runner/mcp` | MCP exporter that turns eligible registered actions into MCP tools. |
 | `@agent-action-runner/cli` | Local development CLI for manifests, workflow validation, runner smoke-runs, docs generation, and MCP previews. |
+| `@agent-action-runner/opentelemetry` | OpenTelemetry wrapper for runner action/workflow spans and metrics. |
+| `@agent-action-runner/testing` | Framework-neutral test harness and approval/policy/audit helpers. |
 
 ## API Reuse Boundary
 
@@ -144,6 +150,8 @@ const result = await runner.executeWorkflow({
 ```
 
 `timeoutMs` marks an attempt as failed; it does not cancel work that already started in Node.js. For `mutate` actions with retry, design the underlying service around idempotency keys, transactions, and single-use approval consumption.
+
+Handlers receive `ctx.signal`, an `AbortSignal` that is aborted when the attempt times out or when the caller-provided signal aborts. This is cooperative cancellation only: pass the signal into cancellable database, HTTP, or queue clients when they support it.
 
 ## Idempotency For Mutations
 
@@ -304,6 +312,9 @@ npx @agent-action-runner/cli workflow:run ./agent-workflows/example.workflow.jso
 npx @agent-action-runner/cli mcp:preview
 npx @agent-action-runner/cli mcp:serve --runner ./dist/agent-runner.js
 npx @agent-action-runner/cli actions:export --runner ./dist/agent-runner.js --out ./.agent-runner/actions.json
+npx @agent-action-runner/cli actions:openapi --runner ./dist/agent-runner.js --out docs/agent-actions.openapi.json
+npx @agent-action-runner/cli workflow:explain ./agent-workflows/example.workflow.json --runner ./dist/agent-runner.js
+npx @agent-action-runner/cli workflow:graph ./agent-workflows/example.workflow.json --runner ./dist/agent-runner.js
 npx @agent-action-runner/cli doctor
 ```
 

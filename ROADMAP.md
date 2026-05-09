@@ -120,20 +120,26 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Improved NestJS duplicate action discovery errors.
 - Documented stable hash `undefined` normalization.
 
-## v0.7.x Candidates
+## v0.8.0
 
-- Consider `AbortSignal` support for cancellable handlers. Timeout would still be cooperative, not forced cancellation.
+- Added cooperative `AbortSignal` support for cancellable handlers. Timeout remains cooperative, not forced cancellation.
+- Added small policy composition helpers in core.
+- Added `@agent-action-runner/testing` for framework-neutral action, approval, policy, and audit test harnesses.
+- Added `@agent-action-runner/opentelemetry` as a wrapper-based instrumentation package.
+- Added CLI `actions:openapi`, `workflow:explain`, and `workflow:graph`.
+- Polished MCP idempotency callback typing and documentation around raw MCP input.
+
+## v0.8.x Candidates
+
 - Consider safer audit defaults during a pre-1.0 breaking window. Until then, production docs continue to recommend explicit `auditDefaults`.
+- Consider MCP/CLI OpenAPI schema diagnostics if Zod serialization edge cases become common.
+- Consider Jest/Vitest matchers in `@agent-action-runner/testing` after the framework-neutral helper API stabilizes.
+
+## v0.9.0 Candidates
+
 - Consider a NestJS + Prisma operational example after the Prisma guide is stable.
 - Optional package extraction later: `@agent-action-runner/prisma` or `@agent-action-runner/sql-audit` after demand is clearer.
 - Workflow DSL extensions after reliability basics are validated: condition, parallel execution, and rollback hooks.
-
-## v0.8.0 Candidates
-
-- OpenTelemetry integration, likely as a separate package and runner wrapper.
-- Small policy composition helpers.
-- Testing utilities for action execution, approval, audit, redaction, and idempotency assertions.
-- OpenAPI export and workflow explain/graph tooling if schema serialization remains stable.
 
 ## Later
 

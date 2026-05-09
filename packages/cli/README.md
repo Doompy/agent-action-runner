@@ -141,6 +141,16 @@ agent-action-runner actions:inspect delivery.searchJobs --runner ./dist/agent-ru
 
 Serializable Zod 4 schemas are written as JSON Schema. Non-serializable schemas are marked with `schemaNotSerializable`.
 
+Generate OpenAPI 3.1 documentation from a runner:
+
+```bash
+agent-action-runner actions:openapi \
+  --runner ./dist/agent-runner.js \
+  --out docs/agent-actions.openapi.json
+```
+
+OpenAPI export is intended for documentation, QA, and security review. It does not create a production auth boundary.
+
 ## Workflow Validation
 
 Validate workflow JSON against the manifest:
@@ -160,6 +170,23 @@ agent-action-runner workflow:validate ./agent-workflows/retry.workflow.json \
 Validation catches duplicate step ids, unknown actions, invalid modes, invalid previous step references, and unsupported input values.
 
 It also validates workflow reliability controls such as `timeoutMs`, `retry.maxAttempts`, `retry.delayMs`, and `continueOnError`.
+
+Explain a workflow:
+
+```bash
+agent-action-runner workflow:explain ./agent-workflows/retry.workflow.json \
+  --runner ./dist/agent-runner.js
+```
+
+Generate a Mermaid dependency graph:
+
+```bash
+agent-action-runner workflow:graph ./agent-workflows/retry.workflow.json \
+  --runner ./dist/agent-runner.js \
+  --out docs/retry-workflow.mmd
+```
+
+The graph uses explicit step references only. It does not invent hidden sequential dependencies.
 
 ## Workflow Run
 
@@ -250,7 +277,10 @@ agent-action-runner init
 agent-action-runner actions:list
 agent-action-runner actions:inspect <actionName>
 agent-action-runner actions:export --runner <file>
+agent-action-runner actions:openapi --runner <file>
 agent-action-runner workflow:validate <file>
+agent-action-runner workflow:explain <file>
+agent-action-runner workflow:graph <file>
 agent-action-runner workflow:run <file>
 agent-action-runner mcp:preview
 agent-action-runner mcp:serve
