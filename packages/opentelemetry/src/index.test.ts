@@ -34,10 +34,20 @@ describe('@agent-action-runner/opentelemetry', () => {
       userId: 'user_1',
       action: 'math.double',
       input: { value: 2 },
+      workflowId: 'workflow_1',
+      stepId: 'step_1',
     });
 
     expect(result.output).toEqual({ value: 4 });
     expect(telemetry.spans.map((span) => span.name)).toEqual(['agent_action.execute']);
+    expect(telemetry.spans[0].attributes).toEqual({
+      service: 'test',
+      'agent_action.name': 'math.double',
+      'agent_action.mode': 'read',
+    });
+    expect(JSON.stringify(telemetry.spans[0].attributes)).not.toContain('user_1');
+    expect(JSON.stringify(telemetry.spans[0].attributes)).not.toContain('workflow_1');
+    expect(JSON.stringify(telemetry.spans[0].attributes)).not.toContain('step_1');
     expect(telemetry.counters.agent_action_started_total).toHaveLength(1);
     expect(telemetry.counters.agent_action_succeeded_total).toHaveLength(1);
     expect(telemetry.histograms.agent_action_duration_ms).toHaveLength(1);
@@ -70,6 +80,45 @@ describe('@agent-action-runner/opentelemetry', () => {
     expect(telemetry.spans[0].exceptions).toHaveLength(1);
   });
 
+  it('adds high-cardinality attributes only with explicit opt-in and supports mapping', async () => {
+    const telemetry = createFakeTelemetry();
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'math.double',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+    const instrumented = instrumentRunner(runner, {
+      tracer: telemetry.tracer,
+      meter: telemetry.meter,
+      includeUserId: true,
+      includeWorkflowId: true,
+      includeStepId: true,
+      attributeMapper: ({ attributes }) => ({
+        ...attributes,
+        mapped: true,
+      }),
+    });
+
+    await instrumented.executeAction({
+      userId: 'user_1',
+      action: 'math.double',
+      input: {},
+      workflowId: 'workflow_1',
+      stepId: 'step_1',
+    });
+
+    expect(telemetry.spans[0].attributes).toMatchObject({
+      'agent_action.user_id': 'user_1',
+      'agent_action.workflow_id': 'workflow_1',
+      'agent_action.step_id': 'step_1',
+      mapped: true,
+    });
+    expect(telemetry.counters.agent_action_started_total[0].attributes).toMatchObject({
+      mapped: true,
+    });
+  });
+
   it('wraps workflow execution with spans and metrics', async () => {
     const telemetry = createFakeTelemetry();
     const runner = createRunner();
@@ -99,6 +148,9 @@ describe('@agent-action-runner/opentelemetry', () => {
 
     expect(result.outputByStep.ping).toEqual({ ok: true });
     expect(telemetry.spans.map((span) => span.name)).toEqual(['agent_workflow.execute']);
+    expect(telemetry.spans[0].attributes).toEqual({
+      'agent_workflow.name': 'ping',
+    });
     expect(telemetry.counters.agent_workflow_started_total).toHaveLength(1);
     expect(telemetry.counters.agent_workflow_succeeded_total).toHaveLength(1);
   });

@@ -37,4 +37,6 @@ expect(findAuditEvents(harness.getAuditEvents(), {
 })).toHaveLength(1);
 ```
 
+Use `auditEventsContainText(events, text)` when you need a simple leak check across captured audit events. It uses circular-safe serialization and represents `Error` values by `{ name, message }`, so helper assertions do not throw just because a full audit payload contains circular objects.
+
 The package intentionally does not provide Jest/Vitest matchers yet. It exposes plain functions so it can work with any test runner.

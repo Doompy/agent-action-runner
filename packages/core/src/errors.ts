@@ -75,6 +75,13 @@ export class WorkflowExecutionError extends AgentActionRunnerError {
   }
 }
 
+export class WorkflowAbortedError extends AgentActionRunnerError {
+  constructor(cause?: unknown) {
+    super('Workflow execution was aborted.');
+    this.cause = cause;
+  }
+}
+
 export class WorkflowValidationError extends AgentActionRunnerError {
   constructor(readonly issues: readonly WorkflowValidationIssue[]) {
     super('Workflow definition failed validation.');

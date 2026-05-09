@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/opentelemetry",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "OpenTelemetry instrumentation for Agent Action Runner.",
   "license": "Apache-2.0",
   "author": "Doompy",
@@ -55,11 +55,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
-    "@agent-action-runner/core": "^0.8.0",
+    "@agent-action-runner/core": "^0.8.1",
     "@opentelemetry/api": "^1.9.0"
   },
   "devDependencies": {
-    "@agent-action-runner/core": "file:../core",
+    "@agent-action-runner/core": "^0.8.1",
     "@opentelemetry/api": "^1.9.0",
     "vitest": "^4.0.14",
     "zod": "^4.1.13"

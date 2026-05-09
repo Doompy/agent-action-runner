@@ -209,6 +209,7 @@ export type ActionExecutionResult<Output = unknown> = {
 export type WorkflowExecutionInput = {
   readonly userId: string;
   readonly workflow: WorkflowDefinition;
+  readonly signal?: AbortSignal;
   readonly workflowId?: string;
   readonly allowedModes?: readonly ActionMode[];
   readonly metadata?: Readonly<Record<string, unknown>>;

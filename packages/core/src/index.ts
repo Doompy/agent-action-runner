@@ -101,6 +101,7 @@ export {
   ModeNotAllowedError,
   PolicyRejectedError,
   SchemaValidationError,
+  WorkflowAbortedError,
   WorkflowExecutionError,
   WorkflowValidationError,
 } from './errors.js';

@@ -678,7 +678,7 @@ function createOpenApiDocument(manifest: ActionManifest): Record<string, unknown
     }
 
     const operationId = sanitizeOperationId(action.name);
-    paths[`/actions/${operationId}/execute`] = {
+    paths[`/actions/${encodeURIComponent(action.name)}/execute`] = {
       post: {
         operationId,
         summary: action.description ?? action.name,
@@ -794,12 +794,14 @@ function createWorkflowExplanation(
 
 function createMermaidGraph(explanation: WorkflowExplanation): string {
   const lines = ['flowchart TD'];
+  const nodeIds = createMermaidNodeIdMap(explanation.steps);
+
   for (const step of explanation.steps) {
-    lines.push(`  ${toMermaidNodeId(step.id)}["${escapeMermaidLabel(createMermaidNodeLabel(step))}"]`);
+    lines.push(`  ${getMermaidNodeId(nodeIds, step.id)}["${escapeMermaidLabel(createMermaidNodeLabel(step))}"]`);
   }
   for (const step of explanation.steps) {
     for (const dependency of step.dependsOn) {
-      lines.push(`  ${toMermaidNodeId(dependency)} --> ${toMermaidNodeId(step.id)}`);
+      lines.push(`  ${getMermaidNodeId(nodeIds, dependency)} --> ${getMermaidNodeId(nodeIds, step.id)}`);
     }
   }
 
@@ -832,6 +834,24 @@ function collectStepReferences(value: unknown, references: Set<string>): void {
 
 function createMermaidNodeLabel(step: WorkflowStepExplanation): string {
   return `${step.id}\\n${step.action}${step.mode ? `/${step.mode}` : ''}`;
+}
+
+function createMermaidNodeIdMap(steps: readonly WorkflowStepExplanation[]): ReadonlyMap<string, string> {
+  const used = new Map<string, number>();
+  const ids = new Map<string, string>();
+
+  for (const step of steps) {
+    const base = toMermaidNodeId(step.id);
+    const current = used.get(base) ?? 0;
+    used.set(base, current + 1);
+    ids.set(step.id, current === 0 ? base : `${base}_${current + 1}`);
+  }
+
+  return ids;
+}
+
+function getMermaidNodeId(ids: ReadonlyMap<string, string>, stepId: string): string {
+  return ids.get(stepId) ?? toMermaidNodeId(stepId);
 }
 
 function toMermaidNodeId(value: string): string {

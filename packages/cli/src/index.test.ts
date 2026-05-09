@@ -303,7 +303,7 @@ describe('@agent-action-runner/cli runner module commands', () => {
     expect(result.exitCode).toBe(0);
     const document = JSON.parse(await readFile(out, 'utf8'));
     expect(document.openapi).toBe('3.1.0');
-    expect(document.paths['/actions/math_double/execute'].post).toMatchObject({
+    expect(document.paths['/actions/math.double/execute'].post).toMatchObject({
       operationId: 'math_double',
       'x-agent-action-runner-action-name': 'math.double',
       'x-agent-action-runner-mode': 'read',
@@ -351,6 +351,35 @@ describe('@agent-action-runner/cli runner module commands', () => {
     expect(graph.exitCode).toBe(0);
     expect(graph.stdout).toContain('flowchart TD');
     expect(graph.stdout).toContain('step_jobs --> step_retry');
+  });
+
+  it('keeps workflow graph node ids unique after sanitizing step ids', async () => {
+    const cwd = await createTempDir();
+    const runnerPath = await writeRunnerModule(cwd, { exportStyle: 'named' });
+    const workflowPath = await writeWorkflow(cwd, 'collision.workflow.json', {
+      workflowName: 'collision',
+      steps: [
+        {
+          id: 'a-b',
+          action: 'delivery.searchJobs',
+          input: {},
+        },
+        {
+          id: 'a_b',
+          action: 'delivery.executeRetry',
+          input: {
+            jobIds: { $fromStep: 'a-b', path: '/jobIds' },
+          },
+        },
+      ],
+    });
+
+    const graph = await runTestCli(cwd, ['workflow:graph', workflowPath, '--runner', runnerPath]);
+
+    expect(graph.exitCode).toBe(0);
+    expect(graph.stdout).toContain('step_a_b["a-b');
+    expect(graph.stdout).toContain('step_a_b_2["a_b');
+    expect(graph.stdout).toContain('step_a_b --> step_a_b_2');
   });
 
   it('generates docs and doctor warnings from a real runner', async () => {

@@ -31,6 +31,15 @@ export type OpenTelemetryInstrumentationOptions = {
   readonly tracerName?: string;
   readonly meterName?: string;
   readonly attributes?: Attributes;
+  readonly includeUserId?: boolean;
+  readonly includeWorkflowId?: boolean;
+  readonly includeStepId?: boolean;
+  readonly attributeMapper?: (input: OpenTelemetryAttributeMapperInput) => Attributes;
+};
+
+export type OpenTelemetryAttributeMapperInput = {
+  readonly kind: 'action' | 'workflow';
+  readonly attributes: Attributes;
 };
 
 export function instrumentRunner(
@@ -49,15 +58,15 @@ export function instrumentRunner(
     listActions: () => runner.listActions(),
     executeAction: <Output = unknown>(request: ActionExecutionInput) => (
       executeActionWithTelemetry<Output>(runner, request, {
-        attributes: options.attributes,
         instruments,
+        options,
         tracer,
       })
     ),
     executeWorkflow: (request: WorkflowExecutionInput) => (
       executeWorkflowWithTelemetry(runner, request, {
-        attributes: options.attributes,
         instruments,
+        options,
         tracer,
       })
     ),
@@ -69,14 +78,14 @@ async function executeActionWithTelemetry<Output>(
   request: ActionExecutionInput,
   telemetry: TelemetryRuntime,
 ): Promise<ActionExecutionResult<Output>> {
-  const attributes = createActionAttributes(request, telemetry.attributes);
+  const action = runner.getAction(request.action);
+  const attributes = createActionAttributes(request, telemetry.options, action?.mode);
   telemetry.instruments.actionStarted.add(1, attributes);
   const start = Date.now();
 
   return telemetry.tracer.startActiveSpan('agent_action.execute', { attributes }, async (span) => {
     try {
       const result = await runner.executeAction<Output>(request);
-      span.setAttribute('agent_action.execution_id', result.executionId);
       telemetry.instruments.actionSucceeded.add(1, attributes);
       return result;
     } catch (error) {
@@ -95,13 +104,15 @@ async function executeWorkflowWithTelemetry(
   request: WorkflowExecutionInput,
   telemetry: TelemetryRuntime,
 ): Promise<WorkflowExecutionResult> {
-  const attributes = createWorkflowAttributes(request, telemetry.attributes);
+  const attributes = createWorkflowAttributes(request, telemetry.options);
   telemetry.instruments.workflowStarted.add(1, attributes);
 
   return telemetry.tracer.startActiveSpan('agent_workflow.execute', { attributes }, async (span) => {
     try {
       const result = await runner.executeWorkflow(request);
-      span.setAttribute('agent_workflow.id', result.workflowId);
+      if (telemetry.options.includeWorkflowId) {
+        span.setAttribute('agent_workflow.id', result.workflowId);
+      }
       telemetry.instruments.workflowSucceeded.add(1, attributes);
       return result;
     } catch (error) {
@@ -115,8 +126,8 @@ async function executeWorkflowWithTelemetry(
 }
 
 type TelemetryRuntime = {
-  readonly attributes?: Attributes;
   readonly instruments: RunnerInstruments;
+  readonly options: OpenTelemetryInstrumentationOptions;
   readonly tracer: Tracer;
 };
 
@@ -146,14 +157,16 @@ function createInstruments(meter: Meter): RunnerInstruments {
 
 function createActionAttributes(
   request: ActionExecutionInput,
-  base: Attributes | undefined,
+  options: OpenTelemetryInstrumentationOptions,
+  actionMode: string | undefined,
 ): Attributes {
-  return omitUndefined({
-    ...base,
+  return mapAttributes(options, 'action', {
+    ...options.attributes,
     'agent_action.name': request.action,
-    'agent_action.user_id': request.userId,
-    'agent_action.workflow_id': request.workflowId,
-    'agent_action.step_id': request.stepId,
+    'agent_action.mode': actionMode,
+    ...(options.includeUserId ? { 'agent_action.user_id': request.userId } : {}),
+    ...(options.includeWorkflowId ? { 'agent_action.workflow_id': request.workflowId } : {}),
+    ...(options.includeStepId ? { 'agent_action.step_id': request.stepId } : {}),
     'agent_action.attempt': request.attempt,
     'agent_action.max_attempts': request.maxAttempts,
   });
@@ -161,14 +174,25 @@ function createActionAttributes(
 
 function createWorkflowAttributes(
   request: WorkflowExecutionInput,
-  base: Attributes | undefined,
+  options: OpenTelemetryInstrumentationOptions,
 ): Attributes {
-  return omitUndefined({
-    ...base,
+  return mapAttributes(options, 'workflow', {
+    ...options.attributes,
     'agent_workflow.name': request.workflow.workflowName,
-    'agent_workflow.id': request.workflowId,
-    'agent_action.user_id': request.userId,
+    ...(options.includeWorkflowId ? { 'agent_workflow.id': request.workflowId } : {}),
+    ...(options.includeUserId ? { 'agent_action.user_id': request.userId } : {}),
   });
+}
+
+function mapAttributes(
+  options: OpenTelemetryInstrumentationOptions,
+  kind: OpenTelemetryAttributeMapperInput['kind'],
+  attributes: Record<string, unknown>,
+): Attributes {
+  const safeAttributes = omitUndefined(attributes);
+  return options.attributeMapper
+    ? options.attributeMapper({ kind, attributes: safeAttributes })
+    : safeAttributes;
 }
 
 function recordSpanError(span: Span, error: unknown): void {

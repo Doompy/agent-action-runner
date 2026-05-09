@@ -211,6 +211,20 @@ runner.registerAction({
 
 When `timeoutMs` expires, the runner rejects the attempt with `ActionTimeoutError` and aborts `ctx.signal`. This does not forcibly stop work already running in Node.js. Cancellation only happens if your handler passes the signal to APIs that honor it.
 
+You can also pass a signal when executing a workflow. The runner forwards that signal to each step action and observes it during retry delays.
+
+```ts
+const controller = new AbortController();
+
+await runner.executeWorkflow({
+  userId: 'operator_1',
+  workflow,
+  signal: controller.signal,
+});
+```
+
+If the workflow signal is aborted during a retry delay, the workflow fails with `WorkflowAbortedError`. Action handlers still use cooperative cancellation; a handler that ignores `ctx.signal` is not forcibly stopped.
+
 ## Executing Workflows
 
 Workflows are plain JSON data. They execute sequentially, and each step can reference outputs from earlier steps.

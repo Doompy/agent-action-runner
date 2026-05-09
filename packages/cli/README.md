@@ -151,6 +151,8 @@ agent-action-runner actions:openapi \
 
 OpenAPI export is intended for documentation, QA, and security review. It does not create a production auth boundary.
 
+Generated paths use the URL-encoded original action name to match the HTTP adapter route shape. For example, `math.double` becomes `/actions/math.double/execute`, while path-unsafe characters such as `/` are encoded. `operationId` remains a sanitized identifier such as `math_double`.
+
 ## Workflow Validation
 
 Validate workflow JSON against the manifest:

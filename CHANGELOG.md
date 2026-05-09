@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.8.1] - 2026-05-10
+
+### Changed
+
+- Changed OpenTelemetry instrumentation defaults to exclude high-cardinality or user-identifying attributes such as `userId`, `workflowId`, and `stepId` unless explicitly opted in.
+- Added OpenTelemetry `includeUserId`, `includeWorkflowId`, `includeStepId`, and `attributeMapper` options.
+- Updated CLI OpenAPI export paths to use URL-encoded original action names while keeping sanitized operation ids.
+- Bumped all public packages to `0.8.1` and updated internal peer dependency ranges to `^0.8.1`.
+
+### Fixed
+
+- Cleaned up external `AbortSignal` listeners after action execution completes.
+- Added workflow-level signal propagation to step actions and abort-aware retry delays.
+- Prevented Mermaid node id collisions in `workflow:graph` output.
+- Made `auditEventsContainText()` circular-safe for full audit payload test cases.
+
+### Notes
+
+- `executeWorkflow()` instrumentation still creates a workflow-level span only; it does not yet create child spans for each workflow step.
+
 ## [0.8.0] - 2026-05-10
 
 ### Added

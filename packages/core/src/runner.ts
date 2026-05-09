@@ -7,6 +7,7 @@ import {
   ModeNotAllowedError,
   PolicyRejectedError,
   SchemaValidationError,
+  WorkflowAbortedError,
   WorkflowExecutionError,
   WorkflowValidationError,
 } from './errors.js';
@@ -80,7 +81,7 @@ export class AgentActionRunner {
       input,
       request,
     });
-    const abortController = createExecutionAbortController(request.signal);
+    const abortHandle = createExecutionAbortController(request.signal);
     let approved = false;
     const context: AgentExecutionContext = {
       executionId,
@@ -89,7 +90,7 @@ export class AgentActionRunner {
       userId: request.userId,
       actionName: action.name,
       mode: action.mode,
-      signal: abortController.signal,
+      signal: abortHandle.controller.signal,
       idempotencyKey: request.idempotencyKey,
       approvalToken: request.approvalToken,
       approvalContext,
@@ -101,20 +102,20 @@ export class AgentActionRunner {
       },
     };
 
-    await this.options.audit?.(createAuditEvent({
-      action,
-      auditDefaults: this.options.auditDefaults,
-      attempt: request.attempt,
-      context,
-      input,
-      maxAttempts: request.maxAttempts,
-      summarizeOutput: this.options.summarizeOutput,
-      status: 'started',
-    }));
-
     let approvalId: string | undefined;
 
     try {
+      await this.options.audit?.(createAuditEvent({
+        action,
+        auditDefaults: this.options.auditDefaults,
+        attempt: request.attempt,
+        context,
+        input,
+        maxAttempts: request.maxAttempts,
+        summarizeOutput: this.options.summarizeOutput,
+        status: 'started',
+      }));
+
       const policyResult = await this.options.policy?.({ action, input, context });
       if (policyResult && !policyResult.allowed) {
         throw new PolicyRejectedError(action.name, policyResult.reason);
@@ -139,7 +140,7 @@ export class AgentActionRunner {
         Promise.resolve(action.handler(input, context)),
         request.timeoutMs,
         action.name,
-        abortController,
+        abortHandle.controller,
       );
       const output = parseWithSchema(action, 'output', rawOutput);
 
@@ -177,6 +178,8 @@ export class AgentActionRunner {
         status: 'failed',
       }));
       throw error;
+    } finally {
+      abortHandle.cleanup();
     }
   }
 
@@ -196,6 +199,7 @@ export class AgentActionRunner {
     const stepResults: WorkflowStepResult[] = [];
 
     for (const step of request.workflow.steps) {
+      throwIfWorkflowAborted(request.signal);
       const input = resolveWorkflowInput(step.input, outputByStep);
       const allowedModes = step.allowedModes ?? request.allowedModes;
       const retry = normalizeRetry(step.retry);
@@ -218,6 +222,7 @@ export class AgentActionRunner {
             attempt,
             maxAttempts: retry.maxAttempts,
             timeoutMs: step.timeoutMs,
+            signal: request.signal,
             idempotencyKey: step.idempotencyKey,
             allowedModes,
             approvalToken: step.approvalToken,
@@ -240,7 +245,7 @@ export class AgentActionRunner {
         } catch (error) {
           lastError = error;
           if (attempt < retry.maxAttempts) {
-            await delay(retry.delayMs);
+            await delay(retry.delayMs, request.signal);
           }
         }
       }
@@ -312,22 +317,37 @@ async function withTimeout<Output>(
   });
 }
 
-function createExecutionAbortController(signal: AbortSignal | undefined): AbortController {
+function createExecutionAbortController(signal: AbortSignal | undefined): {
+  readonly controller: AbortController;
+  cleanup(): void;
+} {
   const abortController = new AbortController();
   if (!signal) {
-    return abortController;
+    return {
+      controller: abortController,
+      cleanup: () => {},
+    };
   }
 
   if (signal.aborted) {
     abortController.abort(signal.reason);
-    return abortController;
+    return {
+      controller: abortController,
+      cleanup: () => {},
+    };
   }
 
-  signal.addEventListener('abort', () => {
+  const onAbort = () => {
     abortController.abort(signal.reason);
-  }, { once: true });
+  };
+  signal.addEventListener('abort', onAbort, { once: true });
 
-  return abortController;
+  return {
+    controller: abortController,
+    cleanup: () => {
+      signal.removeEventListener('abort', onAbort);
+    },
+  };
 }
 
 function normalizeRetry(retry: WorkflowStepRetry | undefined): Required<WorkflowStepRetry> {
@@ -337,14 +357,40 @@ function normalizeRetry(retry: WorkflowStepRetry | undefined): Required<Workflow
   };
 }
 
-async function delay(delayMs: number): Promise<void> {
+async function delay(delayMs: number, signal: AbortSignal | undefined): Promise<void> {
   if (delayMs <= 0) {
+    throwIfWorkflowAborted(signal);
     return;
   }
 
-  await new Promise((resolve) => {
-    setTimeout(resolve, delayMs);
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, delayMs);
+    const onAbort = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new WorkflowAbortedError(signal?.reason));
+    };
+    const cleanup = () => {
+      signal?.removeEventListener('abort', onAbort);
+    };
+
+    if (signal?.aborted) {
+      clearTimeout(timeout);
+      reject(new WorkflowAbortedError(signal.reason));
+      return;
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
+}
+
+function throwIfWorkflowAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new WorkflowAbortedError(signal.reason);
+  }
 }
 
 function createWorkflowStepError(error: unknown): WorkflowStepError {

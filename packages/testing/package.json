@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/testing",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Framework-neutral testing utilities for Agent Action Runner.",
   "license": "Apache-2.0",
   "author": "Doompy",
@@ -58,10 +58,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
-    "@agent-action-runner/core": "^0.8.0"
+    "@agent-action-runner/core": "^0.8.1"
   },
   "devDependencies": {
-    "@agent-action-runner/core": "file:../core",
+    "@agent-action-runner/core": "^0.8.1",
     "vitest": "^4.0.14",
     "zod": "^4.1.13"
   }

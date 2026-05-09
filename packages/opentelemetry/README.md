@@ -15,6 +15,20 @@ const runner = instrumentRunner(createRunner(), {
 });
 ```
 
+By default, the wrapper avoids high-cardinality or user-identifying attributes. It records action/workflow names and safe static attributes, but does not include `userId`, `workflowId`, or `stepId` unless you explicitly opt in.
+
+```ts
+const runner = instrumentRunner(createRunner(), {
+  includeUserId: true,
+  includeWorkflowId: true,
+  includeStepId: true,
+  attributeMapper: ({ attributes }) => ({
+    ...attributes,
+    deployment: 'local-dev',
+  }),
+});
+```
+
 The wrapper records:
 
 - spans: `agent_action.execute`, `agent_workflow.execute`
@@ -22,3 +36,5 @@ The wrapper records:
 - histogram: `agent_action_duration_ms`
 
 Action input and output payloads are not written to telemetry attributes.
+
+`executeWorkflow()` currently creates a workflow-level span only. It does not create child action spans for each workflow step because the core workflow runner owns step execution internally.

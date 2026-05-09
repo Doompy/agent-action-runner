@@ -129,6 +129,13 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Added CLI `actions:openapi`, `workflow:explain`, and `workflow:graph`.
 - Polished MCP idempotency callback typing and documentation around raw MCP input.
 
+## v0.8.1
+
+- Made OpenTelemetry defaults safer by excluding high-cardinality `userId`, `workflowId`, and `stepId` attributes unless explicitly opted in.
+- Added workflow-level signal propagation and abort-aware retry delays.
+- Aligned CLI OpenAPI paths with URL-encoded original action names.
+- Hardened Mermaid graph node id generation and testing audit text helpers.
+
 ## v0.8.x Candidates
 
 - Consider safer audit defaults during a pre-1.0 breaking window. Until then, production docs continue to recommend explicit `auditDefaults`.

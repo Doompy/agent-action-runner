@@ -98,5 +98,29 @@ export function auditEventsContainText(
   events: readonly ActionExecutionEvent[],
   text: string,
 ): boolean {
-  return JSON.stringify(events).includes(text);
+  return safeStringify(events).includes(text);
+}
+
+function safeStringify(value: unknown): string {
+  const seen = new WeakSet<object>();
+
+  const serialized = JSON.stringify(value, (_key, item: unknown) => {
+    if (item instanceof Error) {
+      return {
+        name: item.name,
+        message: item.message,
+      };
+    }
+
+    if (item !== null && typeof item === 'object') {
+      if (seen.has(item)) {
+        return '[Circular]';
+      }
+      seen.add(item);
+    }
+
+    return item;
+  });
+
+  return serialized ?? '';
 }

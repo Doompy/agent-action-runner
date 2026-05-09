@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/fastify",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Fastify adapter for agent-safe action and workflow runner for TypeScript backends.",
   "license": "Apache-2.0",
   "author": "Doompy",
@@ -60,13 +60,13 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
-    "@agent-action-runner/core": "^0.8.0",
-    "@agent-action-runner/http": "^0.8.0",
+    "@agent-action-runner/core": "^0.8.1",
+    "@agent-action-runner/http": "^0.8.1",
     "fastify": "^4.0.0 || ^5.0.0"
   },
   "devDependencies": {
-    "@agent-action-runner/core": "file:../core",
-    "@agent-action-runner/http": "file:../http",
+    "@agent-action-runner/core": "^0.8.1",
+    "@agent-action-runner/http": "^0.8.1",
     "fastify": "^5.8.5",
     "vitest": "^4.0.14",
     "zod": "^4.1.13"

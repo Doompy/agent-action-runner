@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   ApprovalRequiredError,
   PolicyRejectedError,
+  type ActionExecutionEvent,
 } from '@agent-action-runner/core';
 import {
   allowAll,
@@ -137,5 +138,29 @@ describe('@agent-action-runner/testing', () => {
 
     harness.clearAuditEvents();
     expect(harness.getAuditEvents()).toHaveLength(0);
+  });
+
+  it('checks audit text with circular-safe serialization', () => {
+    const payload: Record<string, unknown> = {
+      note: 'visible-marker',
+      error: new Error('safe-error-message'),
+    };
+    payload.self = payload;
+
+    const events: ActionExecutionEvent[] = [
+      {
+        executionId: 'exec_1',
+        userId: 'user_1',
+        actionName: 'admin.searchUsers',
+        mode: 'read',
+        status: 'started',
+        input: payload,
+        createdAt: new Date(),
+      },
+    ];
+
+    expect(auditEventsContainText(events, 'visible-marker')).toBe(true);
+    expect(auditEventsContainText(events, 'safe-error-message')).toBe(true);
+    expect(auditEventsContainText(events, 'missing-secret')).toBe(false);
   });
 });

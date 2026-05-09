@@ -7,6 +7,7 @@ import {
   PolicyRejectedError,
   SchemaValidationError,
   WorkflowExecutionError,
+  WorkflowAbortedError,
   WorkflowValidationError,
   allowModes,
   composePolicies,
@@ -433,6 +434,44 @@ describe('AgentActionRunner', () => {
 
     expect(result.output).toEqual({ aborted: true });
     expect(signal?.aborted).toBe(true);
+  });
+
+  it('cleans up external abort signal listeners after action execution', async () => {
+    const abortController = new AbortController();
+    const signal = abortController.signal as AbortSignal & {
+      addEventListener: AbortSignal['addEventListener'];
+      removeEventListener: AbortSignal['removeEventListener'];
+    };
+    const addEventListener = signal.addEventListener.bind(signal);
+    const removeEventListener = signal.removeEventListener.bind(signal);
+    let addCount = 0;
+    let removeCount = 0;
+
+    signal.addEventListener = ((...args: Parameters<AbortSignal['addEventListener']>) => {
+      addCount += 1;
+      return addEventListener(...args);
+    }) as AbortSignal['addEventListener'];
+    signal.removeEventListener = ((...args: Parameters<AbortSignal['removeEventListener']>) => {
+      removeCount += 1;
+      return removeEventListener(...args);
+    }) as AbortSignal['removeEventListener'];
+
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'signal.cleanup',
+      mode: 'read',
+      handler: () => ({ ok: true }),
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'signal.cleanup',
+      input: {},
+      signal,
+    });
+
+    expect(addCount).toBe(1);
+    expect(removeCount).toBe(1);
   });
 
   it('aborts the handler context signal when an action times out', async () => {
@@ -874,6 +913,78 @@ describe('AgentActionRunner', () => {
         stepId: 'retry',
       },
     ]);
+  });
+
+  it('passes workflow signals to step action contexts', async () => {
+    const abortController = new AbortController();
+    const signals: AbortSignal[] = [];
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'signal.workflow',
+      mode: 'read',
+      handler: (_input, context) => {
+        signals.push(context.signal);
+        return { aborted: context.signal.aborted };
+      },
+    });
+
+    const result = await runner.executeWorkflow({
+      userId: 'user_1',
+      signal: abortController.signal,
+      workflow: {
+        workflowName: 'signal-workflow',
+        steps: [
+          {
+            id: 'signal',
+            action: 'signal.workflow',
+            input: {},
+          },
+        ],
+      },
+    });
+
+    expect(result.outputByStep.signal).toEqual({ aborted: false });
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+  });
+
+  it('aborts workflow retry delays when the workflow signal aborts', async () => {
+    const abortController = new AbortController();
+    let calls = 0;
+    const runner = createRunner();
+
+    runner.registerAction({
+      name: 'unstable.signal',
+      mode: 'read',
+      handler: () => {
+        calls += 1;
+        throw new Error('temporary');
+      },
+    });
+
+    setTimeout(() => {
+      abortController.abort(new Error('stop workflow'));
+    }, 5);
+
+    await expect(runner.executeWorkflow({
+      userId: 'user_1',
+      signal: abortController.signal,
+      workflow: {
+        workflowName: 'abort-delay',
+        steps: [
+          {
+            id: 'unstable',
+            action: 'unstable.signal',
+            input: {},
+            retry: {
+              maxAttempts: 2,
+              delayMs: 50,
+            },
+          },
+        ],
+      },
+    })).rejects.toBeInstanceOf(WorkflowAbortedError);
+    expect(calls).toBe(1);
   });
 
   it('fails workflows when retry attempts are exhausted', async () => {
