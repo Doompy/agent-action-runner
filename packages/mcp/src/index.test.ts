@@ -1,16 +1,26 @@
+import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createRunner } from '@agent-action-runner/core';
 import {
+  createMcpExporter,
   createMcpToolCatalog,
   createMcpToolReport,
   registerMcpTools,
 } from './index.js';
 import type { McpToolRequestContext } from './index.js';
 
+const require = createRequire(import.meta.url);
+const packageJson = require('../package.json') as { readonly version: string };
+
 describe('@agent-action-runner/mcp', () => {
+  it('uses the package version as the default MCP server version', () => {
+    const server = createMcpExporter(createRunner());
+    expect(getServerInfo(server).version).toBe(packageJson.version);
+  });
+
   it('lists only read, draft, and dryRun actions by default', () => {
     const runner = createRunner();
     runner.registerAction({
@@ -268,6 +278,40 @@ describe('@agent-action-runner/mcp', () => {
 
     expect(result.isError).toBe(true);
   });
+
+  it('passes server-derived idempotency keys to action handlers', async () => {
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'delivery.dryRunRetry',
+      mode: 'dryRun',
+      inputSchema: z.object({ jobId: z.string() }),
+      handler: (_input, context) => ({
+        idempotencyKey: context.idempotencyKey ?? null,
+      }),
+    });
+
+    const server = new McpServer({ name: 'test', version: '0.0.0' });
+    registerMcpTools(server, runner, {
+      getUserId: () => 'user_1',
+      getIdempotencyKey: (_context, action, input) => (
+        action.name === 'delivery.dryRunRetry' && isRecord(input)
+          ? `dry-run:${input.jobId}`
+          : undefined
+      ),
+    });
+
+    const result = await callRegisteredTool(server, 'delivery_dryRunRetry', {
+      jobId: 'job_1',
+      idempotencyKey: 'client-key',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      output: {
+        idempotencyKey: 'dry-run:job_1',
+      },
+    });
+  });
 });
 
 async function callRegisteredTool(
@@ -300,6 +344,17 @@ function getRegisteredTool(
   return tool;
 }
 
+function getServerInfo(server: McpServer): { readonly name: string; readonly version: string } {
+  return (server as unknown as {
+    readonly server: {
+      readonly _serverInfo: {
+        readonly name: string;
+        readonly version: string;
+      };
+    };
+  }).server._serverInfo;
+}
+
 function createToolContext(): McpToolRequestContext {
   return {
     signal: new AbortController().signal,
@@ -309,4 +364,8 @@ function createToolContext(): McpToolRequestContext {
       throw new Error('sendRequest is not used in these tests.');
     },
   } as McpToolRequestContext;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

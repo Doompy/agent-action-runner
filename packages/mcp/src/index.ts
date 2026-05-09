@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type {
@@ -18,8 +19,9 @@ import type {
 } from '@agent-action-runner/core';
 
 const DEFAULT_SERVER_NAME = 'agent-action-runner';
-const DEFAULT_SERVER_VERSION = '0.6.0';
 const DEFAULT_EXPOSE_MODES: readonly ActionMode[] = ['read', 'draft', 'dryRun'];
+const require = createRequire(import.meta.url);
+const DEFAULT_SERVER_VERSION = readPackageVersion();
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -34,6 +36,11 @@ export type McpExporterOptions = {
   readonly getUserId?: (context: McpToolRequestContext) => MaybePromise<string>;
   readonly getApprovalToken?: (context: McpToolRequestContext) => MaybePromise<string | undefined>;
   readonly getApprovalContext?: (context: McpToolRequestContext) => MaybePromise<ApprovalContextOverrides | undefined>;
+  readonly getIdempotencyKey?: (
+    context: McpToolRequestContext,
+    action: ExecutableActionDefinition,
+    input: unknown,
+  ) => MaybePromise<string | undefined>;
   readonly getMetadata?: (context: McpToolRequestContext) => MaybePromise<Readonly<Record<string, unknown>> | undefined>;
 };
 
@@ -196,6 +203,7 @@ async function executeMcpTool(
       allowedModes: resolveAllowedModes(options),
       approvalToken: await options.getApprovalToken?.(context),
       approvalContext: await options.getApprovalContext?.(context),
+      idempotencyKey: await options.getIdempotencyKey?.(context, action, input),
       metadata: await options.getMetadata?.(context),
     });
     const structuredContent = {
@@ -398,6 +406,15 @@ function getMetadataString(
 ): string | undefined {
   const value = metadata?.[key];
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function readPackageVersion(): string {
+  try {
+    const manifest = require('../package.json') as { readonly version?: unknown };
+    return typeof manifest.version === 'string' ? manifest.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

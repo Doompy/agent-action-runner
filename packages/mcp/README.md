@@ -120,6 +120,25 @@ createMcpExporter(runner, {
 
 If `getUserId` is omitted, the exporter tries metadata keys such as `agent-action-runner/userId` and `userId`. If no user id is available, tool execution returns an MCP tool error.
 
+For retry-sensitive tools, derive idempotency keys on the server side. Client-supplied tool arguments are still treated as action input, not trusted execution options.
+
+```ts
+createMcpExporter(runner, {
+  getUserId: () => 'operator_1',
+  getIdempotencyKey: async (_context, action, input) => {
+    if (action.name === 'delivery.executeRetry' && typeof input === 'object' && input !== null) {
+      const jobId = (input as { jobId?: unknown }).jobId;
+      const dryRunHash = (input as { dryRunHash?: unknown }).dryRunHash;
+      return typeof jobId === 'string' && typeof dryRunHash === 'string'
+        ? `retry:${jobId}:${dryRunHash}`
+        : undefined;
+    }
+
+    return undefined;
+  },
+});
+```
+
 ## Tool Results
 
 Successful tool calls return both `structuredContent` and a JSON text fallback.
@@ -183,6 +202,7 @@ type McpExporterOptions = {
   getUserId?: (context) => string | Promise<string>;
   getApprovalToken?: (context) => string | undefined | Promise<string | undefined>;
   getApprovalContext?: (context) => ApprovalContextOverrides | undefined | Promise<ApprovalContextOverrides | undefined>;
+  getIdempotencyKey?: (context, action, input) => string | undefined | Promise<string | undefined>;
   getMetadata?: (context) => Readonly<Record<string, unknown>> | undefined | Promise<Readonly<Record<string, unknown>> | undefined>;
 };
 ```

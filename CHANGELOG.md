@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.7.1] - 2026-05-09
+
+### Fixed
+
+- Fixed the MCP default server version so it is read from the package manifest instead of a stale hard-coded value.
+
+### Added
+
+- Added MCP `getIdempotencyKey(context, action, input)` option so MCP tool calls can pass server-derived idempotency keys to action handlers.
+- Added workflow validation for step `allowedModes` that exclude the known action mode.
+- Added Express adapter `jsonParser` option for custom body parsers or host-managed parsing.
+- Added NestJS duplicate action discovery errors with provider and method context.
+- Added stable hash tests and documentation for `undefined` normalization.
+
+### Changed
+
+- Bumped all public packages to `0.7.1` and updated internal peer dependency ranges to `^0.7.1`.
+
 ## [0.7.0] - 2026-05-09
 
 ### Added

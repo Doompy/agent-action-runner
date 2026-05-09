@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/mcp",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "MCP exporter for Agent Action Runner.",
   "license": "Apache-2.0",
   "author": "Doompy",
@@ -60,7 +60,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "peerDependencies": {
-    "@agent-action-runner/core": "^0.7.0",
+    "@agent-action-runner/core": "^0.7.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.0.0"
   },

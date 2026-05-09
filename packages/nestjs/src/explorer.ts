@@ -1,9 +1,11 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { DiscoveryService } from '@nestjs/core';
 import type {
+  ActionDefinition,
   AgentActionRunner,
   AgentExecutionContext,
 } from '@agent-action-runner/core';
+import { ActionAlreadyRegisteredError } from '@agent-action-runner/core';
 import { AGENT_RUNNER } from './constants.js';
 import { getAgentActionMetadata } from './decorators.js';
 
@@ -29,7 +31,7 @@ export class AgentActionExplorer implements OnModuleInit {
           continue;
         }
 
-        this.runner.registerAction({
+        this.registerDiscoveredAction({
           ...metadata,
           handler: (input: unknown, context: AgentExecutionContext) => {
             const handler = instance[methodName as keyof typeof instance];
@@ -39,10 +41,34 @@ export class AgentActionExplorer implements OnModuleInit {
 
             return handler.call(instance, input, context);
           },
-        });
+        }, getProviderName(instance), methodName);
       }
     }
   }
+
+  private registerDiscoveredAction(
+    definition: ActionDefinition<unknown, unknown>,
+    providerName: string,
+    methodName: string,
+  ): void {
+    try {
+      this.runner.registerAction(definition);
+    } catch (error) {
+      if (error instanceof ActionAlreadyRegisteredError) {
+        throw new Error(
+          `Failed to register Agent action "${definition.name}" from ${providerName}.${methodName}: ${error.message}`,
+          { cause: error },
+        );
+      }
+
+      throw error;
+    }
+  }
+}
+
+function getProviderName(instance: object): string {
+  const constructorName = instance.constructor?.name;
+  return constructorName && constructorName.length > 0 ? constructorName : 'UnknownProvider';
 }
 
 function getMethodNames(instance: object): readonly string[] {

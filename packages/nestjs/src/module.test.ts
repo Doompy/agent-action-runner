@@ -68,6 +68,17 @@ class RunnerConsumer {
   ) {}
 }
 
+@Injectable()
+class DuplicateDeliveryAgentActions {
+  @AgentAction({
+    name: 'delivery.searchJobs',
+    mode: 'read',
+  })
+  duplicateSearchJobs() {
+    return { jobIds: [] };
+  }
+}
+
 describe('AgentRunnerModule', () => {
   it('discovers decorated provider methods and registers core actions', async () => {
     const moduleRef = await Test.createTestingModule({
@@ -166,5 +177,23 @@ describe('AgentRunnerModule', () => {
     });
 
     await moduleRef.close();
+  });
+
+  it('adds provider and method context to duplicate action discovery errors', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AgentRunnerModule.forRoot()],
+      providers: [DeliveryAgentActions, DuplicateDeliveryAgentActions],
+    }).compile();
+
+    try {
+      await moduleRef.init();
+      throw new Error('Expected duplicate action discovery to fail.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toMatch(/DuplicateDeliveryAgentActions\.duplicateSearchJobs/);
+    }
+
+    // Do not call close after a failed Nest init; Nest may try to process
+    // partially initialized lifecycle hooks again.
   });
 });

@@ -311,6 +311,7 @@ Validation catches:
 - duplicate step ids
 - unknown actions when an action catalog is supplied
 - invalid action modes
+- step `allowedModes` that exclude the known action mode
 - invalid retry, timeout, or continue-on-error controls
 - invalid idempotency keys
 - references to missing or future steps
@@ -362,6 +363,8 @@ const inputHash = createStableHash({
   dryRunHash: 'dry_run_hash',
 });
 ```
+
+The stable hash is based on normalized JSON-compatible input. Object properties with `undefined` values are treated as absent, so `{}` and `{ optional: undefined }` hash the same. In arrays, `undefined` is normalized like `null` to preserve array positions.
 
 Inside a handler, call `ctx.requireApproval()` before performing a sensitive mutation when you want an explicit guard at the mutation point. This is a defense-in-depth check for actions that were already approved through `mutate` mode or `approvalRequired`; it does not start an interactive approval flow by itself.
 

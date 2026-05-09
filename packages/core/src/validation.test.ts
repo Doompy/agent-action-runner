@@ -113,6 +113,29 @@ describe('validateWorkflowDefinition', () => {
     ]);
   });
 
+  it('reports step allowedModes that exclude the action mode', () => {
+    const result = validateWorkflowDefinition({
+      workflowName: 'mode-mismatch',
+      steps: [
+        {
+          id: 'dryRun',
+          action: 'delivery.dryRunRetry',
+          allowedModes: ['read'],
+          input: {},
+        },
+      ],
+    }, { actions });
+
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        code: 'modeNotAllowedForStep',
+        actionName: 'delivery.dryRunRetry',
+        stepId: 'dryRun',
+        path: '/steps/0/allowedModes',
+      }),
+    ]);
+  });
+
   it('accepts retry, timeout, and continueOnError step controls', () => {
     const result = validateWorkflowDefinition({
       workflowName: 'reliable-workflow',

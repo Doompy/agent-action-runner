@@ -14,6 +14,7 @@ export type WorkflowValidationIssueCode =
   | 'duplicateStepId'
   | 'unknownAction'
   | 'invalidMode'
+  | 'modeNotAllowedForStep'
   | 'invalidStepReference'
   | 'invalidIdempotencyKey'
   | 'invalidInputValue'
@@ -106,6 +107,7 @@ export function validateWorkflowDefinition(
     }
 
     const actionName = typeof step.action === 'string' ? step.action : undefined;
+    let knownAction: WorkflowValidationAction | undefined;
     if (!actionName || actionName.length === 0) {
       issues.push({
         code: 'invalidSteps',
@@ -113,7 +115,11 @@ export function validateWorkflowDefinition(
         path: `${stepPath}/action`,
         stepId,
       });
-    } else if (hasActionCatalog && !knownActions.has(actionName)) {
+    } else {
+      knownAction = knownActions.get(actionName);
+    }
+
+    if (actionName && hasActionCatalog && !knownAction) {
       issues.push({
         code: 'unknownAction',
         message: `Action "${actionName}" is not in the action catalog.`,
@@ -124,7 +130,16 @@ export function validateWorkflowDefinition(
     }
 
     if ('allowedModes' in step) {
-      validateAllowedModes(step.allowedModes, `${stepPath}/allowedModes`, stepId, issues);
+      const allowedModes = validateAllowedModes(step.allowedModes, `${stepPath}/allowedModes`, stepId, issues);
+      if (knownAction?.mode && allowedModes && !allowedModes.includes(knownAction.mode)) {
+        issues.push({
+          code: 'modeNotAllowedForStep',
+          message: `Step allowedModes does not include action mode "${knownAction.mode}".`,
+          path: `${stepPath}/allowedModes`,
+          actionName,
+          stepId,
+        });
+      }
     }
 
     if ('idempotencyKey' in step) {
@@ -179,7 +194,7 @@ function validateAllowedModes(
   path: string,
   stepId: string | undefined,
   issues: WorkflowValidationIssue[],
-): void {
+): readonly ActionMode[] | undefined {
   if (!Array.isArray(value)) {
     issues.push({
       code: 'invalidMode',
@@ -187,9 +202,10 @@ function validateAllowedModes(
       path,
       stepId,
     });
-    return;
+    return undefined;
   }
 
+  const modes: ActionMode[] = [];
   value.forEach((mode, index) => {
     if (typeof mode !== 'string' || !ACTION_MODES.includes(mode as ActionMode)) {
       issues.push({
@@ -198,8 +214,13 @@ function validateAllowedModes(
         path: `${path}/${index}`,
         stepId,
       });
+      return;
     }
+
+    modes.push(mode as ActionMode);
   });
+
+  return modes;
 }
 
 function validateIdempotencyKey(

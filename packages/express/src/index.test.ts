@@ -102,6 +102,31 @@ describe('@agent-action-runner/express', () => {
       });
   });
 
+  it('allows the host app to provide the JSON parser', async () => {
+    const runner = createRunner();
+    runner.registerAction({
+      name: 'math.double',
+      mode: 'read',
+      inputSchema: z.object({ value: z.number() }),
+      handler: (input) => ({ value: input.value * 2 }),
+    });
+
+    const app = express();
+    app.use(express.json({ limit: '256kb' }));
+    app.use('/agent-runner', createExpressAdapter(runner, {
+      getUserId: () => 'user_1',
+      jsonParser: false,
+    }));
+
+    await request(app)
+      .post('/agent-runner/actions/math.double/execute')
+      .send({ input: { value: 21 } })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.result.output).toEqual({ value: 42 });
+      });
+  });
+
   it('requires server-provided mutate mode and approval token', async () => {
     const runner = createRunner({
       approval: ({ approvalToken }) => (

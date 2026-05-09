@@ -46,6 +46,17 @@ app.use('/agent-runner', createExpressAdapter(runner, {
 app.listen(3000);
 ```
 
+The adapter installs `express.json()` by default. In production, you can provide your own parser or disable adapter-level parsing when the host app already owns body parsing and size limits:
+
+```ts
+app.use(express.json({ limit: '256kb' }));
+
+app.use('/agent-runner', createExpressAdapter(runner, {
+  getUserId: (req) => req.user.id,
+  jsonParser: false,
+}));
+```
+
 ## Endpoints
 
 With the adapter mounted at `/agent-runner`, the routes are:
@@ -149,6 +160,7 @@ By default, the adapter ignores these request body fields:
 - `allowedModes`
 - `approvalToken`
 - `approvalContext`
+- `idempotencyKey`
 - `metadata`
 
 Set `allowClientExecutionOptions: true` only for trusted internal tooling.

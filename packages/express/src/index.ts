@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import type { AgentActionRunner } from '@agent-action-runner/core';
 import {
   createActionListResponse,
@@ -10,7 +10,9 @@ import {
 } from '@agent-action-runner/http';
 import type { AgentHttpAdapterOptions } from '@agent-action-runner/http';
 
-export type ExpressAgentRunnerAdapterOptions = AgentHttpAdapterOptions<Request>;
+export type ExpressAgentRunnerAdapterOptions = AgentHttpAdapterOptions<Request> & {
+  readonly jsonParser?: false | RequestHandler;
+};
 
 export function createExpressAdapter(
   runner: AgentActionRunner,
@@ -18,7 +20,9 @@ export function createExpressAdapter(
 ): Router {
   const router = Router();
 
-  router.use(express.json());
+  if (options.jsonParser !== false) {
+    router.use(options.jsonParser ?? express.json());
+  }
 
   router.get('/actions', (_request, response) => {
     response.json(createActionListResponse(runner));

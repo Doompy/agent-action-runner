@@ -111,9 +111,19 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Expanded Prisma production pattern documentation for approval single-use consume, idempotency reserve/replay, audit append, and retry race conditions.
 - Kept MCP idempotency hooks, Prisma packages, and NestJS + Prisma operational examples out of scope until the production pattern is validated.
 
+## v0.7.1
+
+- Added MCP idempotency key resolver hooks.
+- Fixed MCP default server version drift by reading the package manifest.
+- Added workflow validation for step allowed mode mismatches.
+- Added Express body parser control for production body limit ownership.
+- Improved NestJS duplicate action discovery errors.
+- Documented stable hash `undefined` normalization.
+
 ## v0.7.x Candidates
 
-- Add MCP idempotency key resolver hooks if tool-call retry behavior needs first-class support.
+- Consider `AbortSignal` support for cancellable handlers. Timeout would still be cooperative, not forced cancellation.
+- Consider safer audit defaults during a pre-1.0 breaking window. Until then, production docs continue to recommend explicit `auditDefaults`.
 - Consider a NestJS + Prisma operational example after the Prisma guide is stable.
 - Optional package extraction later: `@agent-action-runner/prisma` or `@agent-action-runner/sql-audit` after demand is clearer.
 - Workflow DSL extensions after reliability basics are validated: condition, parallel execution, and rollback hooks.
