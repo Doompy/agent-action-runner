@@ -62,6 +62,12 @@ export class DuplicateWorkflowStepError extends AgentActionRunnerError {
   }
 }
 
+export class InvalidAuditPolicyError extends AgentActionRunnerError {
+  constructor(pointer: unknown) {
+    super(`Audit redactPaths must contain valid JSON Pointer paths. Received: ${String(pointer)}`);
+  }
+}
+
 export class WorkflowExecutionError extends AgentActionRunnerError {
   constructor(stepId: string, actionName: string, cause: unknown) {
     super(`Workflow step "${stepId}" failed while executing action "${actionName}".`);

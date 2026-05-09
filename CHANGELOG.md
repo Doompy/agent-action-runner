@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.6.3] - 2026-05-09
+
+### Fixed
+
+- Made the default `output: 'summary'` fallback safe by reporting payload shape instead of JSON-stringifying the full output.
+- Added runtime validation for audit `redactPaths`; invalid paths now fail with `InvalidAuditPolicyError` instead of being interpreted loosely.
+
+### Added
+
+- Added dedicated audit policy unit tests for mode handling, JSON Pointer redaction, escaped paths, missing paths, circular objects, `Date`, `Error`, invalid paths, and safe summary fallback.
+- Added `release:check` to verify root/package/lockfile versions, internal package ranges, and changelog sections.
+- Added release consistency checks to CI and publish workflows.
+
+### Changed
+
+- Bumped all public packages to `0.6.3` and updated internal peer dependency ranges to `^0.6.3`.
+- Updated README and API reuse docs to emphasize reducing repeated MCP/HTTP/workflow/test wrappers by registering service methods once as actions.
+- Documented that `error: 'full'` with `redactPaths` may serialize `Error` objects with stack data, and that production systems should prefer `error: 'summary'`.
+
 ## [0.6.2] - 2026-05-07
 
 ### Added

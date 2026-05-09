@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/cli",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "CLI for Agent Action Runner local development, manifest inspection, workflow validation, and MCP previews.",
   "license": "Apache-2.0",
   "author": "Doompy",
@@ -63,8 +63,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@agent-action-runner/core": "^0.6.2",
-    "@agent-action-runner/mcp": "^0.6.2",
+    "@agent-action-runner/core": "^0.6.3",
+    "@agent-action-runner/mcp": "^0.6.3",
     "zod": "^4.0.0"
   },
   "peerDependencies": {

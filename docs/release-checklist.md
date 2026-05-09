@@ -11,6 +11,7 @@ npm run build
 npm run typecheck
 npm test
 npm run cli:smoke
+npm run release:check
 npm run pack:check
 npm run publish:workspaces -- --dry-run
 npm audit --omit=dev

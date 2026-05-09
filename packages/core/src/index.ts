@@ -85,6 +85,7 @@ export {
   ActionTimeoutError,
   ApprovalRequiredError,
   DuplicateWorkflowStepError,
+  InvalidAuditPolicyError,
   InvalidStepReferenceError,
   ModeNotAllowedError,
   PolicyRejectedError,

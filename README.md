@@ -1,6 +1,8 @@
 # Agent Action Runner
 
-A safe, application-native action and workflow runner for TypeScript backends.
+A TypeScript backend action layer for AI agent tool-calling.
+
+Instead of rewriting the same service logic as separate agent tools, MCP handlers, HTTP endpoints, workflow steps, and local smoke-test scripts, register existing service methods once as actions and reuse them across surfaces.
 
 Expose existing service logic as agent-callable actions with schema validation, policy guards, dry-run, human approval, and audit logging without giving agents direct database, internal API, or arbitrary code execution access.
 

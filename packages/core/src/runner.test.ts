@@ -464,6 +464,41 @@ describe('AgentActionRunner', () => {
     });
   });
 
+  it('does not serialize full output when summary fallback is used', async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const runner = createRunner({
+      auditDefaults: {
+        output: 'summary',
+      },
+      audit: (event) => {
+        events.push(event as unknown as Record<string, unknown>);
+      },
+    });
+
+    runner.registerAction({
+      name: 'audit.defaultSummary',
+      mode: 'read',
+      handler: () => ({
+        token: 'secret-output-token',
+        nested: {
+          password: 'secret-output-password',
+        },
+      }),
+    });
+
+    await runner.executeAction({
+      userId: 'user_1',
+      action: 'audit.defaultSummary',
+      input: {},
+    });
+
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain('secret-output-token');
+    expect(serialized).not.toContain('secret-output-password');
+    expect(events[1].outputSummary).toBe('object');
+    expect(Object.prototype.hasOwnProperty.call(events[1], 'output')).toBe(false);
+  });
+
   it('lets action audit policies override defaults and merge redact paths', async () => {
     const events: Array<Record<string, unknown>> = [];
     const runner = createRunner({

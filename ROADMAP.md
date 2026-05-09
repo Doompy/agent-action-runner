@@ -94,6 +94,14 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Added security, MCP security, NestJS production, audit redaction, and release checklist docs.
 - Kept persistence packages, idempotency, OpenTelemetry, and policy helpers out of scope.
 
+## v0.6.3
+
+- Hardened audit `output: 'summary'` fallback so it reports payload shape instead of serializing full output.
+- Added runtime validation for audit `redactPaths`.
+- Split audit policy behavior into dedicated unit tests.
+- Added release consistency tooling to reduce version, changelog, lockfile, and internal peer range drift.
+- Improved README/API reuse positioning around avoiding repeated MCP, HTTP, workflow, docs, and test wrappers.
+
 ## v0.7.0 Candidates
 
 - First-class `idempotencyKey` propagation through action execution context.

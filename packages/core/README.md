@@ -437,6 +437,8 @@ Payload modes:
 
 `hash` stores `{ hash }` after redaction using `createStableHash()`. `output: 'summary'` stores only `outputSummary`. `error: 'summary'` stores `{ name, message }` and omits stack/cause fields.
 
+When no custom `summarizeOutput` hook is configured, `output: 'summary'` falls back to a safe shape summary such as `object`, `array(length=3)`, or `string`; it does not JSON-stringify the full output payload. If you keep `error: 'full'` while using `redactPaths`, `Error` objects may be cloned into serializable objects containing `name`, `message`, and `stack`. Production systems should prefer `error: 'summary'`.
+
 ```ts
 import { createAuditHook, createRunner, type AuditStore } from '@agent-action-runner/core';
 
@@ -476,6 +478,7 @@ The core package exports typed errors for common failure paths:
 - `SchemaValidationError`
 - `InvalidStepReferenceError`
 - `DuplicateWorkflowStepError`
+- `InvalidAuditPolicyError`
 - `WorkflowExecutionError`
 - `WorkflowValidationError`
 

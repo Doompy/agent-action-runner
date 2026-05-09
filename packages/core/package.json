@@ -1,6 +1,6 @@
 {
   "name": "@agent-action-runner/core",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Agent-safe action and workflow runner core for TypeScript backends with schema validation, approval, and audit.",
   "license": "Apache-2.0",
   "author": "Doompy",

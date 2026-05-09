@@ -44,5 +44,8 @@ jobs:
       - name: CLI smoke
         run: npm run cli:smoke
 
+      - name: Release consistency
+        run: npm run release:check
+
       - name: Check package contents
         run: npm run pack:check

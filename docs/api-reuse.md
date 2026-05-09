@@ -39,6 +39,18 @@ runner.registerAction({
 
 The handler should call your existing service or use-case layer. It should not duplicate business rules in a separate agent-only path.
 
+## Why Not Just Write Tools Directly?
+
+Without a shared action layer, the same backend service often gets wrapped repeatedly:
+
+- one wrapper for MCP
+- one wrapper for HTTP
+- one wrapper for local tests
+- one wrapper for workflow execution
+- one wrapper for docs and manifests
+
+Agent Action Runner centralizes that wrapper into a registered action. The same action registry can then feed HTTP adapters, MCP tools, CLI smoke-runs, workflow execution, manifests, and generated docs.
+
 ## Mutation Pattern
 
 Use narrow mutation actions and keep broad read actions filter-based.

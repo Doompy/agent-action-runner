@@ -68,7 +68,9 @@ Mode behavior:
 - `summary`: for `output`, store only `outputSummary`; for `error`, store `{ name, message }`.
 - `omit`: leave the field undefined so JSON serialization omits it.
 
-`output: 'summary'` uses the runner `summarizeOutput` hook when supplied. If the hook returns no summary, core falls back to a simple JSON/string summary.
+`output: 'summary'` uses the runner `summarizeOutput` hook when supplied. If the hook returns no summary, core falls back to a safe shape summary such as `object`, `array(length=3)`, `string`, or `number`. The fallback does not JSON-stringify the full output payload.
+
+For domain-specific audit records, provide `summarizeOutput`. A business summary such as `disabled user_123` or `retryable=3 blocked=1` is usually more useful than a generic shape summary.
 
 ## JSON Pointer Redaction
 
@@ -91,6 +93,10 @@ Redaction happens before mode handling. For example, `input: 'hash'` hashes the 
 Audit events never include the raw `approvalToken`. When a token is present, events include `approvalTokenHash`.
 
 `approvalTokenHash` is a redacted audit correlation fingerprint. It is not a secure token storage scheme by itself. Approval stores should use secret-backed HMACs or sufficiently random tokens, plus expiry and single-use consumption where mutations are involved.
+
+## Error Payloads
+
+If you keep `error: 'full'` while configuring `redactPaths`, `Error` objects may be cloned into serializable objects containing `name`, `message`, and `stack` so path redaction can be applied. Production systems should prefer `error: 'summary'` unless full stack data is explicitly required and safe to retain.
 
 ## Recommended Production Baseline
 

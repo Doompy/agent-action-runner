@@ -1,4 +1,5 @@
 import { createStableHash } from './hash.js';
+import { InvalidAuditPolicyError } from './errors.js';
 import type {
   AuditPayloadPolicy,
   ExecutableActionDefinition,
@@ -96,6 +97,12 @@ function resolveAuditPayloadPolicy(
 }
 
 function uniqueJsonPointers(paths: readonly JsonPointer[]): readonly JsonPointer[] {
+  for (const path of paths) {
+    if (!isJsonPointer(path)) {
+      throw new InvalidAuditPolicyError(path);
+    }
+  }
+
   return [...new Set(paths)];
 }
 
@@ -152,6 +159,10 @@ function redactJsonPointer(value: unknown, pointer: JsonPointer): void {
   }
 
   setContainerValue(cursor, target, REDACTED);
+}
+
+function isJsonPointer(value: unknown): value is JsonPointer {
+  return typeof value === 'string' && (value === '' || value.startsWith('/'));
 }
 
 function getContainerValue(container: unknown, key: string): unknown {
@@ -256,12 +267,23 @@ function summarizeError(error: unknown): { readonly name?: string; readonly mess
 }
 
 function defaultAuditSummary(value: unknown): string {
-  try {
-    const serialized = JSON.stringify(value);
-    return serialized === undefined ? String(value) : serialized;
-  } catch {
-    return String(value);
+  if (Array.isArray(value)) {
+    return `array(length=${value.length})`;
   }
+
+  if (value === null) {
+    return 'null';
+  }
+
+  if (value instanceof Date) {
+    return 'date';
+  }
+
+  if (typeof value === 'object') {
+    return 'object';
+  }
+
+  return typeof value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
