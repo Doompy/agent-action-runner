@@ -707,13 +707,14 @@ function createOpenApiDocument(manifest: ActionManifest): Record<string, unknown
             description: 'Action execution result.',
             content: {
               'application/json': {
-                schema: {
-                  type: 'object',
-                  additionalProperties: true,
-                },
+                schema: createActionSuccessResponseSchema(action),
               },
             },
           },
+          400: createErrorResponse('Bad request.'),
+          403: createErrorResponse('Forbidden by mode, policy, or approval checks.'),
+          404: createErrorResponse('Action not found.'),
+          500: createErrorResponse('Unexpected server error.'),
         },
       },
     };
@@ -726,6 +727,69 @@ function createOpenApiDocument(manifest: ActionManifest): Record<string, unknown
       version: CLI_PACKAGE_VERSION,
     },
     paths,
+  };
+}
+
+function createErrorResponse(description: string): Record<string, unknown> {
+  return {
+    description,
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            ok: { const: false },
+            error: {
+              type: 'object',
+              properties: {
+                code: { type: 'string' },
+                message: { type: 'string' },
+                issues: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: true,
+                  },
+                },
+              },
+              required: ['code', 'message'],
+              additionalProperties: true,
+            },
+          },
+          required: ['ok', 'error'],
+          additionalProperties: true,
+        },
+      },
+    },
+  };
+}
+
+function createActionSuccessResponseSchema(action: ActionManifestEntry): Record<string, unknown> {
+  const resultProperties: Record<string, unknown> = {
+    executionId: { type: 'string' },
+    actionName: { const: action.name },
+    mode: { const: action.mode },
+  };
+  const required = ['executionId', 'actionName', 'mode'];
+
+  if (action.outputSchemaStatus === 'present' && action.outputSchema !== undefined) {
+    resultProperties.output = action.outputSchema;
+    required.push('output');
+  }
+
+  return {
+    type: 'object',
+    properties: {
+      ok: { const: true },
+      result: {
+        type: 'object',
+        properties: resultProperties,
+        required,
+        additionalProperties: true,
+      },
+    },
+    required: ['ok', 'result'],
+    additionalProperties: true,
   };
 }
 

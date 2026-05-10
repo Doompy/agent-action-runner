@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 This project follows semantic versioning before 1.0 with the usual pre-1.0 caveat: public APIs may change between minor versions while the core contracts settle.
 
+## [0.8.2] - 2026-05-10
+
+### Added
+
+- Added README positioning for “Why not just MCP SDK?”, compatibility with agent frameworks, a production checklist, and the read -> dryRun -> approve -> mutate -> audit operational flow.
+- Added `examples/nestjs-prisma-approval-ops`, a NestJS + Prisma production-pattern example covering approval single-use consume, idempotency reserve/replay, mutation, and durable audit append.
+- Added standalone docs for MCP positioning, agent framework integration, and a production readiness checklist.
+
+### Changed
+
+- Improved CLI OpenAPI export so action response schemas include `result.output` when an action has a serializable `outputSchema`.
+- Added common OpenAPI error response schemas for generated action documentation.
+- Bumped all public packages to `0.8.2` and updated internal peer dependency ranges to `^0.8.2`.
+
 ## [0.8.1] - 2026-05-10
 
 ### Changed

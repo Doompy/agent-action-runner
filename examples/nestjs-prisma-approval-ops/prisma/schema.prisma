@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model AdminUser {
+  id             String @id
+  email          String
+  name           String
+  status         String
+  activeSessions Int
+}
+
+model AgentApproval {
+  id               String    @id
+  tokenHash        String    @unique
+  userId           String
+  actionName       String
+  inputHash        String
+  resourceIdsJson  String?
+  dryRunHash       String?
+  expiresAt        DateTime
+  consumedAt       DateTime?
+  consumedByExecId String?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId, actionName])
+  @@index([expiresAt])
+}
+
+model AgentAuditEvent {
+  id                 String   @id
+  executionId        String
+  workflowId         String?
+  stepId             String?
+  userId             String
+  actionName         String
+  mode               String
+  status             String
+  attempt            Int?
+  maxAttempts        Int?
+  inputJson          String?
+  outputSummary      String?
+  approvalId         String?
+  approvalTokenHash  String?
+  idempotencyKeyHash String?
+  errorJson          String?
+  createdAt          DateTime @default(now())
+
+  @@index([executionId])
+  @@index([actionName, status])
+}
+
+model AgentIdempotencyKey {
+  key         String    @id
+  actionName  String
+  userId      String
+  executionId String?
+  status      String
+  resultJson  String?
+  errorJson   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([actionName, userId])
+}

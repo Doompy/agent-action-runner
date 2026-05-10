@@ -308,6 +308,36 @@ describe('@agent-action-runner/cli runner module commands', () => {
       'x-agent-action-runner-action-name': 'math.double',
       'x-agent-action-runner-mode': 'read',
     });
+    expect(
+      document.paths['/actions/math.double/execute'].post.responses['200'].content['application/json'].schema,
+    ).toMatchObject({
+      properties: {
+        ok: { const: true },
+        result: {
+          properties: {
+            actionName: { const: 'math.double' },
+            mode: { const: 'read' },
+            output: {
+              type: 'object',
+              additionalProperties: true,
+            },
+          },
+        },
+      },
+    });
+    expect(
+      document.paths['/actions/math.double/execute'].post.responses['403'].content['application/json'].schema,
+    ).toMatchObject({
+      properties: {
+        ok: { const: false },
+        error: {
+          properties: {
+            code: { type: 'string' },
+            message: { type: 'string' },
+          },
+        },
+      },
+    });
     expect(document.paths['/actions/danger_rawMutation/execute']).toBeUndefined();
   });
 

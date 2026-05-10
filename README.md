@@ -64,6 +64,57 @@ existing service method
 Your backend remains responsible for authentication, authorization, transactions, and side effects. The runner gives agents a narrow boundary for calling existing business logic safely.
 
 See [API Reuse Guide](./docs/api-reuse.md) for the recommended service wrapping pattern.
+See [MCP vs Agent Action Runner](./docs/mcp-vs-agent-action-runner.md) for how this differs from using MCP SDK directly.
+See [Agent Framework Integration](./docs/agent-frameworks.md) for using this boundary with LangChain, Vercel AI SDK, OpenAI Agents SDK, Mastra, or MCP clients.
+
+## Why Not Just MCP SDK?
+
+MCP tells clients how to call tools.
+
+Agent Action Runner helps your backend decide what tools exist, who may call them, which modes are allowed, when approval is required, how calls are audited, and how retries stay idempotent.
+
+Use MCP when you need a standard tool transport. Use Agent Action Runner when you need an application-owned action boundary in front of existing services, permissions, transactions, approval flows, and audit stores.
+
+## Works With Agent Frameworks
+
+Agent Action Runner is not an agent reasoning framework. It is the backend action boundary those frameworks can call.
+
+Use LangChain, Vercel AI SDK, OpenAI Agents SDK, Mastra, or another agent framework for planning and reasoning. Use Agent Action Runner to expose your TypeScript backend actions safely through HTTP, MCP, CLI smoke-runs, workflow JSON, generated docs, and tests.
+
+## Production Checklist
+
+Before exposing a backend action to an agent, check:
+
+- `inputSchema` and `outputSchema`
+- `mode`: `read`, `draft`, `dryRun`, or `mutate`
+- `riskLevel` and `resourceType`
+- dry-run availability for operational changes
+- approval requirement for mutation
+- policy checks for role, scope, tenant, and resource access
+- audit policy for input, output, and error minimization
+- idempotency key strategy for retries and timeouts
+- timeout and retry settings
+- OpenTelemetry spans and metrics
+
+See [Production Checklist](./docs/production-checklist.md) for the expanded version.
+
+## Operational Flow
+
+```mermaid
+flowchart TD
+  request["Operator or agent request"]
+  read["read action"]
+  dryRun["dryRun action"]
+  approval["human approval"]
+  mutate["mutate action"]
+  audit["audit event"]
+
+  request --> read
+  read --> dryRun
+  dryRun --> approval
+  approval --> mutate
+  mutate --> audit
+```
 
 Core action execution supports Zod 3 and Zod 4 schemas. MCP and CLI JSON Schema serialization are based on Zod 4; use Zod 4 for actions you want to export as MCP tools or manifest schemas.
 
@@ -320,6 +371,8 @@ npx @agent-action-runner/cli doctor
 
 The CLI reads `agent-runner.config.json` and `.agent-runner/actions.json`. Runner module commands use compiled ESM JavaScript and expect the module to export `runner` or default export an `AgentActionRunner` instance. It does not auto-discover NestJS decorators, Express routes, Fastify plugins, or TypeScript source.
 
+`actions:openapi` exports an OpenAPI 3.1 action catalog with request input schemas, common error responses, and, when available, response `result.output` schemas. It is useful for docs, QA, and security review; it does not create an auth boundary.
+
 See [examples/cli-basic](./examples/cli-basic) for a local runner module, sample workflow, and MCP preview flow.
 
 The intended local loop is: compile a dev runner module, export/inspect actions, validate workflow JSON, run read/dryRun smoke workflows, then preview or serve MCP tools.
@@ -454,6 +507,7 @@ read -> dryRun -> approve -> mutate -> audit
 
 - [Express Admin Ops](./examples/express-admin-ops) shows the HTTP adapter wiring.
 - [NestJS Admin Ops](./examples/nestjs-admin-ops) shows NestJS DI and `@AgentAction()` discovery.
+- [NestJS Prisma Approval Ops](./examples/nestjs-prisma-approval-ops) shows approval single-use consume, idempotency reserve/replay, and durable audit append with Prisma.
 - [Fastify Admin Ops](./examples/fastify-admin-ops) shows the Fastify plugin wiring.
 - [Persistent Admin Ops](./examples/persistent-admin-ops) shows the same flow with file-backed approval records and append-only audit JSONL.
 - [Delivery Ops](./examples/delivery-ops) shows the domain workflow for retrying failed delivery jobs through search, dry-run, approval, retry execution, and audit.
@@ -461,6 +515,8 @@ read -> dryRun -> approve -> mutate -> audit
 The adapter examples demonstrate `admin.searchUsers`, `admin.dryRunDisableUser`, and `admin.disableUser` with an HMAC-bound approval token and an in-memory audit trail.
 
 The persistent example uses the same actions with file-backed approval/audit storage. It stores approval token hashes instead of raw tokens, binds approvals to `userId`, `actionName`, `inputHash`, `resourceIds`, `dryRunHash`, and `expiresAt`, and persists `started`, `succeeded`, and `failed` audit events without storing the raw approval token.
+
+The NestJS Prisma example turns the same pattern into a transaction-backed application flow: reserve idempotency, consume approval once, perform the mutation, store replay output, and append audit records.
 
 The delivery example also includes a CLI config, action manifest, generated-style action docs, and a JSON workflow for local workflow validation and read/dryRun smoke-runs.
 

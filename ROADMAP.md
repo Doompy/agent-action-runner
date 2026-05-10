@@ -136,15 +136,21 @@ This project is focused on a safety boundary between agents and TypeScript backe
 - Aligned CLI OpenAPI paths with URL-encoded original action names.
 - Hardened Mermaid graph node id generation and testing audit text helpers.
 
+## v0.8.2
+
+- Added product positioning docs for MCP, agent framework integration, and production readiness.
+- Added a NestJS + Prisma approval/idempotency/audit production-pattern example.
+- Improved CLI OpenAPI output with action response schemas and common error responses.
+
 ## v0.8.x Candidates
 
 - Consider safer audit defaults during a pre-1.0 breaking window. Until then, production docs continue to recommend explicit `auditDefaults`.
 - Consider MCP/CLI OpenAPI schema diagnostics if Zod serialization edge cases become common.
 - Consider Jest/Vitest matchers in `@agent-action-runner/testing` after the framework-neutral helper API stabilizes.
+- Validate the NestJS + Prisma approval/idempotency example against a few real backend shapes before extracting a Prisma package.
 
 ## v0.9.0 Candidates
 
-- Consider a NestJS + Prisma operational example after the Prisma guide is stable.
 - Optional package extraction later: `@agent-action-runner/prisma` or `@agent-action-runner/sql-audit` after demand is clearer.
 - Workflow DSL extensions after reliability basics are validated: condition, parallel execution, and rollback hooks.
 
